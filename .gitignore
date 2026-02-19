@@ -1,3 +1,45 @@
+# ==========================================
+# Java Standard
+# ==========================================
+*.class
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files
 *.jar
-*.txt
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# ==========================================
+# IDEs
+# ==========================================
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VS Code
+.vscode/
+
+# ==========================================
+# OS Generated Files
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==========================================
+# Project Specific (from your original .gitignore)
+# ==========================================
 output/
