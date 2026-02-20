@@ -325,8 +325,56 @@ public class MoSSo extends SupernodeHelper {
         }
     }
 
+    // TODO: edit the sampling of a random node (which currently only finds one node) to find top b similar nodes
+    // TODO: for the top b similar nodes find the best node in form of saving and perform tryNodalUpdate on this node
 
-    private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
+    private IntArrayList getBCanidates(int v, IntArrayList cluster, int b) {
+        IntArrayList possible_candidates = new IntArrayList();
+        for (int u : cluster) {
+            if (u != v) possible_candidates.add(u);
+        }
+
+        IntArrayList bCandidates = new IntArrayList();
+        int need = Math.min(b, possible_candidates.size());
+
+        while (bCandidates.size() < need) {
+            int randIndex = randInt(0, possible_candidates.size() - 1);
+            int candidate = possible_candidates.getInt(randIndex);
+
+            if (candidate  == v) continue; // skip self
+
+            bCandidates.add(candidate);
+        }
+        return bCandidates;
+    }
+
+     // Compute Δ for moving node v to supernode S (without applying the move)
+    private long evalDelta(final int v, IntArrayList Nv, Int2IntOpenHashMap edgeDeltaV, final int S) {
+        final int R = V.getInt(v);
+        if (R == S) return Long.MAX_VALUE; // no-op move
+        return getDelta(R, S, Nv, edgeDeltaV);
+    }
+
+    private int getBestSuperNode(int v, IntArrayList bCandidates) {
+        IntArrayList Nv = getNeighbors(v);
+        Int2IntOpenHashMap edgeDeltaV = new Int2IntOpenHashMap();
+        for (int u : Nv) edgeDeltaV.addTo(V.getInt(u), 1);
+
+        long bestDelta = Long.MAX_VALUE;
+        int bestSuperNode = -1;
+
+        for (int candidate : bCandidates) {
+            int superNodeCandidate = V.getInt(candidate);
+            long delta = evalDelta(v, Nv, edgeDeltaV, superNodeCandidate);
+            if (delta < bestDelta && delta <= 0) { // selects the delta that minimizes the representation cost
+                bestDelta = delta;
+                bestSuperNode = superNodeCandidate;
+            }
+        }
+        return bestSuperNode;
+    }
+
+    private void _processEdge(final int dst, IntArrayList srcnbd, final int which, final int bCandidate) {
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         if(getDegree(dst) > 0) srcnbd.set(0, dst);
         // coarse clustering using minhash
@@ -339,11 +387,23 @@ public class MoSSo extends SupernodeHelper {
             int nbd = srcnbd.getInt(i);
             if (randInt(1, getDegree(nbd)) <= 1) {
                 long mh = minHash[which].getInt(nbd);
-                int sz = srcGrp.get(mh).size();
-                // choose random node in the cluster containing nbd
-                int target = srcGrp.get(mh).getInt(randInt(0, sz - 1));
-                if (randInt(1, 10) > escape || iteration < 1000) {
-                    tryNodalUpdate(nbd, V.getInt(target));
+
+                IntArrayList cluster = srcGrp.get(mh);
+                if (cluster == null || cluster.isEmpty()) continue;
+                
+                boolean doEscape = !(randInt(1, 10) > escape || iteration < 1000);
+                
+                if (!doEscape) {
+                    // with single minHash there are now difference between minHash to nodes in the same cluster 
+                    // hence sample b random nodes from the cluster and not top b as mags-dm
+                    IntArrayList bCandidates = getBCanidates(nbd, cluster, bCandidate);
+                    if (bCandidates.isEmpty()) continue;
+
+                    int bestSuperNode = getBestSuperNode(nbd, bCandidates);
+                    
+                    if (bestSuperNode != -1) {
+                        tryNodalUpdate(nbd, bestSuperNode);
+                    }
                 } else {
                     // only if the supernode containing nbd is not singleton
                     if(getSize(V.getInt(nbd)) > 1) tryNodalUpdate(nbd, newSupernode());
@@ -389,6 +449,8 @@ public class MoSSo extends SupernodeHelper {
 
     @Override
     public void processEdge(final int src, final int dst, final boolean add) {
+        int bCandidate = 1;
+
         iteration += 1;
         if(add){
             ecnt += 1;
@@ -410,14 +472,14 @@ public class MoSSo extends SupernodeHelper {
         int which = randInt(0, n_hash-1);
         if(getDegree(src) > 0){
             IntArrayList srcnbd = getRandomNeighbors(src, sampleNumber);
-            _processEdge(dst, srcnbd, which);
+            _processEdge(dst, srcnbd, which, bCandidate);
         }else{
             // since node src is an isolated node
             deactivateNode(src);
         }
         if(getDegree(dst) > 0){
             IntArrayList dstnbd = getRandomNeighbors(dst, sampleNumber);
-            _processEdge(src, dstnbd, which);
+            _processEdge(src, dstnbd, which, bCandidate);
         }else{
             // since node dst is an isolated node
             deactivateNode(dst);
