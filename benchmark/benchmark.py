@@ -1,3 +1,33 @@
+"""
+MoSSo vs. Hybrid MoSSo Benchmark Runner.
+
+This script automates the performance evaluation between the original KDD'20
+MoSSo algorithm and the newly implemented Hybrid MoSSo (Mags-DM) algorithm.
+
+Usage Examples:
+---------------
+1. Run the full remote dataset benchmark suite:
+   $ python3 benchmark/benchmark.py --mode remote
+
+2. Run a benchmark on a specific local graph file:
+   $ python3 benchmark/benchmark.py --mode local --file example_graph.txt
+
+3. Skip the Java compilation phase:
+   $ python3 benchmark/benchmark.py --mode local --file example_graph.txt --skip-build
+
+4. Override the default algorithm hyperparameters:
+   $ python3 benchmark/benchmark.py --mode remote --samples 50 --escape 5 --interval 10000
+
+Arguments:
+----------
+--mode: (REQUIRED) 'remote' to download and run remote datasets, or 'local' for a custom file.
+--file: (Conditional) Path to the local text file. Required if --mode is 'local'.
+--skip-build: (Optional) Flag to skip Git cloning and Java compilation.
+--samples: (Optional) Number of random neighbors to sample. Default is 120.
+--escape: (Optional) Escape probability parameter for the MoSSo algorithm. Default is 3.
+--interval: (Optional) Logging interval for the Java output. Default is 1000.
+"""
+
 import argparse
 import subprocess
 import urllib.request
@@ -9,7 +39,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Configuration
-ORIGINAL_REPO_URL = "https://github.com/TDT4900-Masteroppgave/kdd20-mosso"
+ORIGINAL_REPO_URL = "https://github.com/jihoonko/kdd20-mosso"
 DATASETS_DIR = "datasets"
 OUTPUT_DIR = "output"
 EXTERNAL_DIR = "external"
@@ -24,7 +54,7 @@ SAMPLE_NUMBER = 120
 ESCAPE = 3
 INTERVAL = 1000
 
-# SNAP Datasets Definition
+# Remote Datasets Definition
 datasets = {
     "small": [
         ("https://snap.stanford.edu/data/as-caida20071105.txt.gz", "as-caida20071105.txt"),
@@ -190,14 +220,14 @@ def print_benchmark_summary(dataset_name, t_orig, t_hyb, r_orig, r_hyb):
     print("="*50 + "\n")
 
 
-# --- Mode 1: SNAP Benchmark ---
-def run_snap_suite(samples, escape, interval):
-    results_file = os.path.join(BENCHMARK_DIR, "snap_results.csv")
-    plot_file = os.path.join(BENCHMARK_DIR, "snap_comparison.png")
+# Mode 1: Remote Benchmark
+def run_remote_suite(samples, escape, interval):
+    results_file = os.path.join(BENCHMARK_DIR, "remote_results.csv")
+    plot_file = os.path.join(BENCHMARK_DIR, "remote_comparison.png")
     results = []
 
     for category, data_list in datasets.items():
-        print(f"\n=== SNAP CATEGORY: {category.upper()} ===")
+        print(f"\n=== REMOTE CATEGORY: {category.upper()} ===")
         for url, filename in data_list:
             dataset_name = filename.replace(".txt", "")
             path = download_and_prepare_dataset(url, filename)
@@ -216,7 +246,7 @@ def run_snap_suite(samples, escape, interval):
 
     plot_results(results_file, plot_file)
 
-# --- Mode 2: Local File Benchmark ---
+# Mode 2: Local File Benchmark
 def run_local_suite(file_path, samples, escape, interval):
     if not os.path.exists(file_path):
         print(f"[!] Error: Cannot find file '{file_path}'")
@@ -243,8 +273,8 @@ def run_local_suite(file_path, samples, escape, interval):
 
 def main():
     parser = argparse.ArgumentParser(description="MoSSo Graph Summarization Benchmarking Tool")
-    parser.add_argument("--mode", choices=["snap", "local"], required=True,
-                        help="Choose 'snap' to run the SNAP datasets, or 'local' for a specific file.")
+    parser.add_argument("--mode", choices=["remote", "local"], required=True,
+                        help="Choose 'remote' to run the remote datasets, or 'local' for a specific file.")
     parser.add_argument("--file", type=str,
                         help="Path to your local graph file (Required if mode is 'local')")
     parser.add_argument("--skip-build", action="store_true",
@@ -264,8 +294,8 @@ def main():
 
     setup_directories()
 
-    if args.mode == "snap":
-        run_snap_suite(args.samples, args.escape, args.interval)
+    if args.mode == "remote":
+        run_remote_suite(args.samples, args.escape, args.interval)
     elif args.mode == "local":
         if not args.file:
             print("[!] Error: You must provide a --file argument when using --mode local.")
