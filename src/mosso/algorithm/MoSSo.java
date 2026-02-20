@@ -355,7 +355,7 @@ public class MoSSo extends SupernodeHelper {
         return getDelta(R, S, Nv, edgeDeltaV);
     }
 
-    private int getBestSuperNode(int v, IntArrayList bCandidates) {
+    private void tryBestSuperNode(int v, IntArrayList bCandidates) {
         IntArrayList Nv = getNeighbors(v);
         Int2IntOpenHashMap edgeDeltaV = new Int2IntOpenHashMap();
         for (int u : Nv) edgeDeltaV.addTo(V.getInt(u), 1);
@@ -371,7 +371,11 @@ public class MoSSo extends SupernodeHelper {
                 bestSuperNode = superNodeCandidate;
             }
         }
-        return bestSuperNode;
+
+        if (bestSuperNode != -1) {
+            costCounter += bestDelta;
+            doNodalUpdate(v, V.getInt(v), bestSuperNode, Nv);
+        }
     }
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which, final int bCandidate) {
@@ -396,13 +400,15 @@ public class MoSSo extends SupernodeHelper {
                 if (!doEscape) {
                     // with single minHash there are now difference between minHash to nodes in the same cluster 
                     // hence sample b random nodes from the cluster and not top b as mags-dm
-                    IntArrayList bCandidates = getBCanidates(nbd, cluster, bCandidate);
-                    if (bCandidates.isEmpty()) continue;
+                    if (bCandidate > 1) {
+                        IntArrayList bCandidates = getBCanidates(nbd, cluster, bCandidate);
+                        if (bCandidates.isEmpty()) continue;
 
-                    int bestSuperNode = getBestSuperNode(nbd, bCandidates);
-                    
-                    if (bestSuperNode != -1) {
-                        tryNodalUpdate(nbd, bestSuperNode);
+                        tryBestSuperNode(nbd, bCandidates);
+                    } else {
+                        int sz = srcGrp.get(mh).size();
+                        int target = srcGrp.get(mh).getInt(randInt(0, sz - 1));
+                        tryNodalUpdate(nbd, V.getInt(target));
                     }
                 } else {
                     // only if the supernode containing nbd is not singleton
@@ -411,6 +417,7 @@ public class MoSSo extends SupernodeHelper {
             }
         }
     }
+    
 
     private void deactivateNode(final int v){
         int R = V.getInt(v);
@@ -449,7 +456,7 @@ public class MoSSo extends SupernodeHelper {
 
     @Override
     public void processEdge(final int src, final int dst, final boolean add) {
-        int bCandidate = 1;
+        int bCandidate = 5;
 
         iteration += 1;
         if(add){
