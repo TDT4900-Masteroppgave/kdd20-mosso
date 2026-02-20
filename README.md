@@ -1,25 +1,32 @@
-# MoSSo: Lossless Graph Summarization in Fully Dynamic Graph Streams
-Source code for MoSSo, described in the paper [Incremental Lossless Graph Summarization](https://arxiv.org/abs/2006.09935), Jihoon Ko*, Yunbum Kook* and Kijung Shin, KDD 2020.
+# Hybrid MoSSo: Lossless Graph Summarization (MoSSo + Mags-DM)
 
-**MoSSo** (**Mo**ve if **S**aved, **S**tay **o**thewise) is an algorithm for lossless summarization of fully dynamic graphs. **MoSSo** has the following advantages:
-* *Fast and ’any time’*: processing each change in near-constant time, up to 7-orders of magnitude faster than running state-of-the-art batch methods.
-* *Scalable*: summarizing graphs with hundreds of millions of edges, requiring sublinear memory during the process.
-* *Effective*: achieving comparable compression ratios even to state-of-the-art batch methods.
+**Hybrid MoSSo** is an incremental algorithm for lossless graph summarization, developed as part of a Master's thesis at
+NTNU.
 
-## Building and Running **MoSSo**
-Please see [User Guide](user_guide.pdf)
+This project represents a complete fusion of two state-of-the-art approaches: it leverages the dynamic, exact-cost
+evaluation engine of the original **MoSSo (KDD '20)** and upgrades it by implementing the full suite of **Mags-DM**
+optimization principles.
 
-## Datasets and Contributors
-The datasets used in the paper and authors information are listed [here](http://dmlab.kaist.ac.kr/mosso/)
+### Key Features
 
-## Terms and Conditions
-If you use this code as part of any published research, please consider acknowledging our KDD 2020 paper.
+* 🚀 **Full Mags-DM Integration:** A complete implementation of Mags-DM principles inside an incremental environment.
+* ⚡ **Dynamic & Incremental:** Processes graph streams (insertions/deletions) in near-constant time.
+* 📊 **Automated Benchmarking Suite:** A fully parameterized Python pipeline to seamlessly download
+  datasets, compile Java code, and generate comparative performance plots against the original KDD '20 baseline.
 
+---
+
+## Benchmarking
+
+To run the benchmark comparing the original MoSSo against this Hybrid implementation:
+
+### Run on a local graph file
+```bash
+python3 benchmark/benchmark.py --mode local --file example_graph.txt
 ```
-@inproceedings{ko2020incremental,
-  title={Incremental Lossless Graph Summarization},
-  author={Ko, Jihoon and Kook, Yunbum and Shin, Kijung},
-  booktitle={ACM SIGKDD International Conference on Knowledge Discovery and Data Mining},
-  year={2020},
-}
+
+### Run the full remote dataset suite
+```bash
+python3 benchmark/benchmark.py --mode remote
 ```
+
