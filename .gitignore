@@ -1,6 +1,4 @@
-# ==========================================
 # Java Standard
-# ==========================================
 *.class
 
 # Mobile Tools for Java (J2ME)
@@ -15,9 +13,6 @@
 *.tar.gz
 *.rar
 
-# ==========================================
-# IDEs
-# ==========================================
 # IntelliJ IDEA
 .idea/
 *.iml
@@ -28,9 +23,7 @@ out/
 # VS Code
 .vscode/
 
-# ==========================================
 # OS Generated Files
-# ==========================================
 .DS_Store
 .DS_Store?
 ._*
@@ -39,7 +32,13 @@ out/
 ehthumbs.db
 Thumbs.db
 
-# ==========================================
-# Project Specific (from your original .gitignore)
-# ==========================================
+# Project Specific
 output/
+datasets/
+external/
+
+# Python
+.venv
+__pycache__/
+*.py[cod]
+*$py.class
