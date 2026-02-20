@@ -37,6 +37,7 @@ import gzip
 import shutil
 import pandas as pd
 import matplotlib.pyplot as plt
+import stat
 
 # Configuration
 ORIGINAL_REPO_URL = "https://github.com/jihoonko/kdd20-mosso"
@@ -69,16 +70,31 @@ def setup_directories():
     os.makedirs(BENCHMARK_DIR, exist_ok=True)
     os.makedirs(EXTERNAL_DIR, exist_ok=True)
 
+def _on_rm_error(func, path, exc_info):
+    # Change read-only files and retry
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass  # last resort; could also re-raise
+
+def force_rmtree(path):
+    if os.path.exists(path):
+        shutil.rmtree(path, onerror=_on_rm_error)
+
 def build_original_jar():
     print(f"\n[*] Cloning baseline repository to {BASELINE_DIR}...")
+    if os.name == "nt":
+        subprocess.run(["attrib", "-R", "-S", "-H", f"{BASELINE_DIR}\\*", "/S", "/D"], check=False)
     if os.path.exists(BASELINE_DIR):
-        shutil.rmtree(BASELINE_DIR)
+        force_rmtree(BASELINE_DIR)
+        # shutil.rmtree(BASELINE_DIR)
     try:
         subprocess.run(["git", "clone", ORIGINAL_REPO_URL, BASELINE_DIR],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         shutil.copy(FASTUTIL, os.path.join(BASELINE_DIR, FASTUTIL))
         print("[*] Compiling Original MoSSo...")
-        subprocess.run(["sh", "compile.sh"], cwd=BASELINE_DIR, check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["bash", "compile.sh"], cwd=BASELINE_DIR, check=True, stdout=subprocess.DEVNULL)
         shutil.move(os.path.join(BASELINE_DIR, "mosso-1.0.jar"), JAR_ORIGINAL)
         print(f"[*] Success! Saved as {JAR_ORIGINAL}")
     except subprocess.CalledProcessError as e:
