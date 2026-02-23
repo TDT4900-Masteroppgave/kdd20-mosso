@@ -125,12 +125,24 @@ def download_and_prepare_dataset(url, filename):
             print(f"[*] Downloading {filename}...")
             urllib.request.urlretrieve(url, gz_path)
         print(f"[*] Converting {filename} to MoSSo format...")
+
+        seen_edges = set()
+
         with gzip.open(gz_path, 'rt') as f_in, open(txt_path, 'w') as f_out:
             for line in f_in:
                 if line.startswith('#'): continue
                 parts = line.strip().split()
                 if len(parts) >= 2:
-                    f_out.write(f"{parts[0]}\t{parts[1]}\t1\n")
+                    u, v = int(parts[0]), int(parts[1])
+
+                    if u == v: continue # Skip self-loops
+
+                    # Sort to ensure (1, 0) and (0, 1) are treated as the same undirected edge
+                    edge = tuple(sorted((u, v)))
+
+                    if edge not in seen_edges:
+                        seen_edges.add(edge)
+                        f_out.write(f"{u}\t{v}\t1\n")
         os.remove(gz_path)
     return txt_path
 
