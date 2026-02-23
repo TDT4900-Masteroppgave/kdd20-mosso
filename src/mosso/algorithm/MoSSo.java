@@ -6,6 +6,8 @@ import jdk.jshell.spi.ExecutionControl;
 import mosso.SupernodeHelper;
 import static java.lang.Long.min;
 
+import java.util.Arrays;
+
 public class MoSSo extends SupernodeHelper {
     private final int INF = 0x7FFFFFFF;
     private int iteration = 0;
@@ -347,48 +349,103 @@ public class MoSSo extends SupernodeHelper {
         return (double) matches / n_hash;
     }
 
-    private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
-        Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
-        if(getDegree(dst) > 0) srcnbd.set(0, dst);
+     private double calculateMH(int u, int v) {
+        int matches = 0;
+        for (int i = 0; i < n_hash; i++) {
+            if (minHash[i].getInt(u) == minHash[i].getInt(v)) {
+                matches++;
+            }
+        }
+        return (double) matches / n_hash;
+    }
 
-        // coarse clustering using minhash
-        for (int v : srcnbd) {
-            long target = minHash[which].getInt(v);
-            if (!srcGrp.containsKey(target)) srcGrp.put(target, new IntArrayList());
-            srcGrp.get(target).add(v);
+    // Compute Δ for moving node v to supernode S (without applying the move)
+    private long evalDelta(final int v, IntArrayList Nv, Int2IntOpenHashMap edgeDeltaV, final int S) {
+        final int R = V.getInt(v);
+        if (R == S) return Long.MAX_VALUE; // no-op move
+        return getDelta(R, S, Nv, edgeDeltaV);
+    }
+
+    private void tryBestSuperNode(int v, int[] bCandidates) {
+        IntArrayList Nv = getNeighbors(v);
+        Int2IntOpenHashMap edgeDeltaV = new Int2IntOpenHashMap();
+        for (int u : Nv) edgeDeltaV.addTo(V.getInt(u), 1);
+
+        long bestDelta = Long.MAX_VALUE;
+        int bestSuperNode = -1;
+
+        for (int candidate : bCandidates) {
+            int superNodeCandidate = V.getInt(candidate);
+            long delta = evalDelta(v, Nv, edgeDeltaV, superNodeCandidate);
+            if (delta < bestDelta && delta <= 0) { // selects the delta that minimizes the representation cost
+                bestDelta = delta;
+                bestSuperNode = superNodeCandidate;
+            }
         }
 
+        if (bestSuperNode != -1) {
+            costCounter += bestDelta;
+            doNodalUpdate(v, V.getInt(v), bestSuperNode, Nv);
+        }
+    }
+
+    private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
+        int b = 5;
+        double[] topScores = new double[b];
+        int[] topCandidates = new int[b];
+
+        Arrays.fill(topScores, -Double.MAX_VALUE);
+        Arrays.fill(topCandidates, -1);
+
+
         for (int i = 0; i < sampleNumber; i++) {
-            int nbd = srcnbd.getInt(i);
-            if (randInt(1, getDegree(nbd)) <= 1) {
-                long mh = minHash[which].getInt(nbd);
+            int y = srcnbd.getInt(i);
 
-                // MAGS-DM: Similarity Measure
-                int bestTarget = -1;
-                double maxSimilarity = -1.0;
+            if (randInt(1, getDegree(y)) <= 1) {
 
-                IntArrayList candidatePool = srcGrp.get(mh);
-                for (int candidate: candidatePool) {
-                    if (candidate == nbd) continue;
 
-                    double similarity = calculateMH(nbd, candidate, maxSimilarity);
+                for (int candidate : srcnbd) {
+                    if (candidate == y) continue;
 
-                    if (similarity > maxSimilarity) {
-                        maxSimilarity = similarity;
-                        bestTarget = candidate;
+                    double similarity_score = calculateMH(y, candidate);
+
+                    if (similarity_score > topScores[b-1]) {
+                        topScores[b-1] = similarity_score;
+                        topCandidates[b-1] = candidate;
                     }
+
+                    // Bubble the new score up to keep the array sorted descending
+                    for (int j = b - 1; j > 0; j--) {
+                        if (topScores[j] > topScores[j - 1]) {
+                            // Swap scores
+                            double tempScore = topScores[j];
+                            topScores[j] = topScores[j - 1];
+                            topScores[j - 1] = tempScore;
+                            // Swap nodes
+                            int tempNode = topCandidates[j];
+                            topCandidates[j] = topCandidates[j - 1];
+                            topCandidates[j - 1] = tempNode;
+                        } else {
+                            break; // It's in the right place
+                        }
+                    }
+
                 }
 
-                if (bestTarget == -1) {
-                    bestTarget = nbd;
+                // TODO: is it correct to always place dst in the topCandidates?
+                // Add the dst in the topCandidates such that this node is always considered
+                if(getDegree(dst) > 0) {
+                    topScores[b-1] =  calculateMH(y, dst);
+                    topCandidates[b-1] = dst;
                 }
 
-                // Proceed with MoSSo's original update logic using the newly found best target
-                if (randInt(1, 10) > escape || iteration < 1000) {
-                    tryNodalUpdate(nbd, V.getInt(bestTarget));
+                boolean correctiveEscape = !(randInt(1, 10) > escape || iteration < 1000);
+                
+                if (!correctiveEscape && topScores[0] > -Double.MAX_VALUE) { // if not corrective escape and there are at least one candidate
+                    tryBestSuperNode(y, topCandidates);
                 } else {
                     // only if the supernode containing nbd is not singleton
-                    if(getSize(V.getInt(nbd)) > 1) tryNodalUpdate(nbd, newSupernode());
+                    if(getSize(V.getInt(y)) > 1) tryNodalUpdate(y, newSupernode());
                 }
             }
         }
