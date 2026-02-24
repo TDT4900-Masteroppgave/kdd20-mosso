@@ -327,29 +327,7 @@ public class MoSSo extends SupernodeHelper {
         }
     }
 
-
-    /**
-     * MAGS-DM: Calculate estimated Jaccard similarity between two nodes
-     * by comparing their multiple MinHash signatures.
-     */
-    private double calculateMH(int u, int v, double currentBestSim) {
-        int matches = 0;
-        for (int i = 0; i < n_hash; i++) {
-            if (minHash[i].getInt(u) == minHash[i].getInt(v)) {
-                matches++;
-            }
-
-            // OPTIMIZATION: Short-circuit
-            // If the remaining hashes can't possibly result in a better score, stop.
-            int remaining = n_hash - (i + 1);
-            if (((double) matches + remaining) / n_hash < currentBestSim) {
-                return -1.0; // Fail early
-            }
-        }
-        return (double) matches / n_hash;
-    }
-
-     private double calculateMH(int u, int v) {
+    private double calculateMH(int u, int v) {
         int matches = 0;
         for (int i = 0; i < n_hash; i++) {
             if (minHash[i].getInt(u) == minHash[i].getInt(v)) {
@@ -375,6 +353,8 @@ public class MoSSo extends SupernodeHelper {
         int bestSuperNode = -1;
 
         for (int candidate : bCandidates) {
+            if(candidate == -1) continue; // skip if candidate is invalid
+
             int superNodeCandidate = V.getInt(candidate);
             long delta = evalDelta(v, Nv, edgeDeltaV, superNodeCandidate);
             if (delta < bestDelta && delta <= 0) { // selects the delta that minimizes the representation cost
@@ -393,16 +373,18 @@ public class MoSSo extends SupernodeHelper {
         // Add the dst in srcnbd to ensure that dst is always considered as a candidate
        if(getDegree(dst) > 0) srcnbd.set(0, dst);
 
-        int b = 5;
-        double[] topScores = new double[b];
-        int[] topCandidates = new int[b];
-
-        Arrays.fill(topScores, -Double.MAX_VALUE);
-        Arrays.fill(topCandidates, -1);
+        int b = Math.min(5,srcnbd.size());
         
-
         for (int i = 0; i < sampleNumber; i++) {
             int y = srcnbd.getInt(i);
+            if (getDegree(y) == 0) continue; // skip if y is an isolated node
+
+            double[] topScores = new double[b];
+            int[] topCandidates = new int[b];
+    
+            Arrays.fill(topScores, -Double.MAX_VALUE);
+            Arrays.fill(topCandidates, -1);
+            
 
             if (randInt(1, getDegree(y)) <= 1) {
 
@@ -434,11 +416,6 @@ public class MoSSo extends SupernodeHelper {
                     }
 
                 }
-                
-                // if(getDegree(dst) > 0) {
-                //     topCandidates[b-1] = dst;
-                //     topScores[b-1] = calculateMH(y, dst);
-                // }
 
                 boolean correctiveEscape = !(randInt(1, 10) > escape || iteration < 1000);
                 
