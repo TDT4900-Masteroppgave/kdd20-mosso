@@ -390,13 +390,16 @@ public class MoSSo extends SupernodeHelper {
     }
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
+        // Add the dst in srcnbd to ensure that dst is always considered as a candidate
+       if(getDegree(dst) > 0) srcnbd.set(0, dst);
+
         int b = 5;
         double[] topScores = new double[b];
         int[] topCandidates = new int[b];
 
         Arrays.fill(topScores, -Double.MAX_VALUE);
         Arrays.fill(topCandidates, -1);
-
+        
 
         for (int i = 0; i < sampleNumber; i++) {
             int y = srcnbd.getInt(i);
@@ -431,13 +434,11 @@ public class MoSSo extends SupernodeHelper {
                     }
 
                 }
-
-                // TODO: is it correct to always place dst in the topCandidates?
-                // Add the dst in the topCandidates such that this node is always considered
-                if(getDegree(dst) > 0) {
-                    topScores[b-1] =  calculateMH(y, dst);
-                    topCandidates[b-1] = dst;
-                }
+                
+                // if(getDegree(dst) > 0) {
+                //     topCandidates[b-1] = dst;
+                //     topScores[b-1] = calculateMH(y, dst);
+                // }
 
                 boolean correctiveEscape = !(randInt(1, 10) > escape || iteration < 1000);
                 
