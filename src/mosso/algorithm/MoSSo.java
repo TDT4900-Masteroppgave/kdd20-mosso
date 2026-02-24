@@ -370,10 +370,18 @@ public class MoSSo extends SupernodeHelper {
     }
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
+        Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         // Add the dst in srcnbd to ensure that dst is always considered as a candidate
        if(getDegree(dst) > 0) srcnbd.set(0, dst);
 
         int b = Math.min(5,srcnbd.size());
+
+
+        for (int v : srcnbd) {
+            long target = minHash[which].getInt(v);
+            if (!srcGrp.containsKey(target)) srcGrp.put(target, new IntArrayList());
+            srcGrp.get(target).add(v);
+        }
         
         for (int i = 0; i < sampleNumber; i++) {
             int y = srcnbd.getInt(i);
@@ -388,8 +396,8 @@ public class MoSSo extends SupernodeHelper {
 
             if (randInt(1, getDegree(y)) <= 1) {
 
-
-                for (int candidate : srcnbd) {
+                // find topB candidates by similarity scores for candidates in the same minhash bucket as y
+                for (int candidate : srcGrp.get(minHash[which].getInt(y))) { 
                     if (candidate == y) continue;
 
                     double similarity_score = calculateMH(y, candidate);
