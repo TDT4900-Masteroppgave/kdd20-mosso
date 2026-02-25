@@ -425,9 +425,8 @@ public class MoSSo extends SupernodeHelper {
 
                 }
 
-                boolean correctiveEscape = !(randInt(1, 10) > escape || iteration < 1000);
                 
-                if (!correctiveEscape && topScores[0] > -Double.MAX_VALUE) { // if not corrective escape and there are at least one candidate
+                if ((randInt(1, 10) > escape || iteration < 1000) && topScores[0] > -Double.MAX_VALUE) { // if not corrective escape and there are at least one candidate
                     tryBestSuperNode(y, topCandidates);
                 } else {
                     // only if the supernode containing nbd is not singleton
