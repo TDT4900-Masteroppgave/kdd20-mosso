@@ -110,11 +110,13 @@ def build_local_hybrid_jar():
         print(f"[!] Hybrid compilation failed: {e}")
         exit(1)
 
-def build_jars():
+def build_jars(skip_build: bool):
     if not os.path.exists(FASTUTIL):
         print(f"[!] Error: {FASTUTIL} missing. Download it to root first.")
         exit(1)
-    build_original_jar()
+
+    if not skip_build:
+        build_original_jar()
     build_local_hybrid_jar()
 
 def download_and_prepare_dataset(url, filename):
@@ -259,7 +261,7 @@ def run_remote_suite(samples, escape, interval, runs, discard_summaries):
             dataset_name = filename.replace(".txt", "")
             path = download_and_prepare_dataset(url, filename)
 
-            t1_list, r1_list = run_multiple_mosso(JAR_ORIGINAL, path, f"orig_{dataset_name}", samples, escape, interval, runs, discard_summaries)
+            t1_list, r1_list = run_multiple_mosso(JAR_ORIGINAL, path, f"orig_{dataset_name}", 120, 3, interval, runs, discard_summaries)
             t2_list, r2_list = run_multiple_mosso(JAR_HYBRID, path, f"hyb_{dataset_name}", samples, escape, interval, runs, discard_summaries)
 
             if not t1_list or not t2_list:
@@ -347,8 +349,7 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.skip_build:
-        build_jars()
+    build_jars(args.skip_build)
 
     setup_directories()
 
