@@ -15,6 +15,7 @@ public class MoSSo extends SupernodeHelper {
     private int n_hash;
     private int sampleNumber;
     private long start;
+    private int bCandidates;
 
     private IntArrayList[] minHash;
     private IntArrayList[] hf;
@@ -23,7 +24,7 @@ public class MoSSo extends SupernodeHelper {
     private int ecnt = 0;
     private int interval;
 
-    public MoSSo(boolean directed, final int _escape, final int _sample, final int _interval){
+    public MoSSo(boolean directed, final int _escape, final int _sample, final int _interval, int _bCandidates) {
         super(directed);
         if(directed){
             try {
@@ -37,6 +38,7 @@ public class MoSSo extends SupernodeHelper {
         n_hash = 4;
         sampleNumber = _sample;
         interval = _interval;
+        bCandidates = _bCandidates;
         start = System.currentTimeMillis();
         hash_initialization();
     }
@@ -374,7 +376,7 @@ public class MoSSo extends SupernodeHelper {
         // Add the dst in srcnbd to ensure that dst is always considered as a candidate
        if(getDegree(dst) > 0) srcnbd.set(0, dst);
 
-        int b = Math.min(5,srcnbd.size());
+        int b = Math.min(bCandidates,srcnbd.size());
 
 
         for (int v : srcnbd) {
