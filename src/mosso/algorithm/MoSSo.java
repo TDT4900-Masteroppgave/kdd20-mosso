@@ -326,24 +326,66 @@ public class MoSSo extends SupernodeHelper {
     }
 
 
+    /**
+     * MAGS-DM: Calculate estimated Jaccard similarity between two nodes
+     * by comparing their multiple MinHash signatures.
+     */
+    private double calculateMH(int u, int v, double currentBestSim) {
+        int matches = 0;
+        for (int i = 0; i < n_hash; i++) {
+            if (minHash[i].getInt(u) == minHash[i].getInt(v)) {
+                matches++;
+            }
+
+            // OPTIMIZATION: Short-circuit
+            // If the remaining hashes can't possibly result in a better score, stop.
+            int remaining = n_hash - (i + 1);
+            if (((double) matches + remaining) / n_hash < currentBestSim) {
+                return -1.0; // Fail early
+            }
+        }
+        return (double) matches / n_hash;
+    }
+
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         if(getDegree(dst) > 0) srcnbd.set(0, dst);
+
         // coarse clustering using minhash
         for (int v : srcnbd) {
             long target = minHash[which].getInt(v);
             if (!srcGrp.containsKey(target)) srcGrp.put(target, new IntArrayList());
             srcGrp.get(target).add(v);
         }
+
         for (int i = 0; i < sampleNumber; i++) {
             int nbd = srcnbd.getInt(i);
             if (randInt(1, getDegree(nbd)) <= 1) {
                 long mh = minHash[which].getInt(nbd);
-                int sz = srcGrp.get(mh).size();
-                // choose random node in the cluster containing nbd
-                int target = srcGrp.get(mh).getInt(randInt(0, sz - 1));
+
+                // MAGS-DM: Similarity Measure
+                int bestTarget = -1;
+                double maxSimilarity = -1.0;
+
+                IntArrayList candidatePool = srcGrp.get(mh);
+                for (int candidate: candidatePool) {
+                    if (candidate == nbd) continue;
+
+                    double similarity = calculateMH(nbd, candidate, maxSimilarity);
+
+                    if (similarity > maxSimilarity) {
+                        maxSimilarity = similarity;
+                        bestTarget = candidate;
+                    }
+                }
+
+                if (bestTarget == -1) {
+                    bestTarget = nbd;
+                }
+
+                // Proceed with MoSSo's original update logic using the newly found best target
                 if (randInt(1, 10) > escape || iteration < 1000) {
-                    tryNodalUpdate(nbd, V.getInt(target));
+                    tryNodalUpdate(nbd, V.getInt(bestTarget));
                 } else {
                     // only if the supernode containing nbd is not singleton
                     if(getSize(V.getInt(nbd)) > 1) tryNodalUpdate(nbd, newSupernode());
