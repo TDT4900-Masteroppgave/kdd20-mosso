@@ -1,13 +1,10 @@
-"""
-Parameter Analysis Tool for Hybrid MoSSo.
-Iterates through a range of values for a specific parameter to map out the Pareto frontier.
-"""
-
 import os
 import subprocess
+import sys
 import pandas as pd
 import argparse
 from plotter import plot_parameter_analysis
+from utils import setup_directories
 
 SWEEP_CONFIG = {
     "samples": {
@@ -22,76 +19,63 @@ SWEEP_CONFIG = {
     }
 }
 
-def setup_directories():
-    """Guarantees the output directory exists right before saving."""
-    sweep_output_dir = os.path.join("output", "parameter_sweep")
-    os.makedirs(sweep_output_dir, exist_ok=True)
-    return sweep_output_dir
-
-def run_parameter_sweep(param_to_sweep, mode, runs, file_path=None):
+def run_parameter_sweep(param_to_sweep, runs, file_path=None):
     if param_to_sweep not in SWEEP_CONFIG:
         print(f"[!] Invalid parameter. Available: {list(SWEEP_CONFIG.keys())}")
         return
 
-    sweep_values = SWEEP_CONFIG[param_to_sweep]["values"]
-
     print(f"[*] Initiating Parameter Sweep for: {param_to_sweep.upper()}")
-    print(f"[*] Testing values: {sweep_values}")
+    setup_directories()
 
-    # Pre-build the JARs once to save time
     print("\n[*] Initializing build...")
-    subprocess.run(["python3", "benchmark/benchmark.py", "--mode", "remote", "--runs", "1", "--keep-summaries"], check=True)
-
+    # Run once to build JARs, without passing a file argument
+    subprocess.run([sys.executable, "scripts/benchmark.py", "--runs", "1", "--keep-summaries"], check=True)
     all_results = []
+
+    sweep_values = SWEEP_CONFIG[param_to_sweep]["values"]
 
     for val in sweep_values:
         print(f"\n{'='*60}")
         print(f"[*] SWEEPING: {param_to_sweep} = {val}")
         print(f"{'='*60}")
 
-        # Construct the base command
         cmd = [
-            "python3", "benchmark/benchmark.py",
-            "--mode", mode,
+            sys.executable, "scripts/benchmark.py",
             "--runs", str(runs),
-            "--skip-build" # Skip building since we did it above
+            "--skip-build"
         ]
 
-        # Add the local file if required
-        if mode == "local" and file_path:
+        if file_path:
             cmd.extend(["--file", file_path])
 
-        # Inject the parameter being swept, and use defaults for the rest
         for p_name, p_config in SWEEP_CONFIG.items():
             current_val = val if p_name == param_to_sweep else p_config["default"]
             cmd.extend([p_config["arg_flag"], str(current_val)])
 
-        # Run the benchmark
         subprocess.run(cmd)
 
-        # Harvest the output from benchmark.py (which defaults to output/benchmark/)
-        result_file = "output/benchmark/remote_results.csv" if mode == "remote" else f"output/benchmark/local_{os.path.basename(file_path)}_results.csv"
+        # Determine which results file benchmark.py generated
+        result_file = "output/benchmark/remote_results.csv"
+        if file_path:
+            dataset_name = os.path.basename(file_path).replace(".txt", "").replace(".csv", "")
+            result_file = f"output/benchmark/local_{dataset_name}_results.csv"
 
         if os.path.exists(result_file):
             df = pd.read_csv(result_file)
-            df[param_to_sweep] = val # Tag the dataframe with the current sweep parameter
+            df[param_to_sweep] = val
             all_results.append(df)
         else:
             print(f"[!] Warning: No results generated for {param_to_sweep} = {val}")
 
-    # Aggregate and Plot in the new sweep_output_dir
     if all_results:
-        # Guarantee directory exists RIGHT BEFORE saving
-        sweep_output_dir = setup_directories()
+        sweep_output_dir = os.path.join("output", "parameter_sweep") # Explicitly define for saving
 
         final_df = pd.concat(all_results, ignore_index=True)
         master_csv = os.path.join(sweep_output_dir, f"sweep_{param_to_sweep}_results.csv")
 
-        # Save the CSV
         final_df.to_csv(master_csv, index=False)
         print(f"\n[*] Sweep complete! Master CSV saved to {master_csv}")
 
-        # Generate the Plot
         plot_output = os.path.join(sweep_output_dir, f"sweep_{param_to_sweep}_plot.pdf")
         plot_parameter_analysis(master_csv, param_to_sweep, plot_output)
 
@@ -99,20 +83,16 @@ def main():
     parser = argparse.ArgumentParser(description="Parameter Sweep Tool for MoSSo")
     parser.add_argument("--param", choices=list(SWEEP_CONFIG.keys()), required=True,
                         help="The parameter you want to analyze.")
-    parser.add_argument("--mode", choices=["remote", "local"], default="remote",
-                        help="Dataset mode (remote runs all 3 datasets).")
+
     parser.add_argument("--file", type=str,
-                        help="Required if mode is local.")
+                        help="Optional: Path to a specific local graph file. If omitted, sweeps the default dataset suite.")
+
     parser.add_argument("--runs", type=int, default=1,
                         help="Number of iterations per parameter value.")
 
     args = parser.parse_args()
 
-    if args.mode == "local" and not args.file:
-        print("[!] Error: You must provide --file when using --mode local.")
-        return
-
-    run_parameter_sweep(args.param, args.mode, args.runs, args.file)
+    run_parameter_sweep(args.param, args.runs, args.file)
 
 if __name__ == "__main__":
     main()
