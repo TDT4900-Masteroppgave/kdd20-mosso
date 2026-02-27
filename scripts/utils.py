@@ -48,10 +48,18 @@ def setup_directories():
 
 # --- JAVA COMPILATION ---
 def build_original_jar():
-    print(f"\n[*] Compiling Original MoSSo (Skipping git clone to preserve local edits)...")
+    print(f"\n[*] Compiling Original MoSSo...")
+
     if not os.path.exists(BASELINE_DIR):
-        print(f"[!] Error: Directory {BASELINE_DIR} does not exist. Please clone it manually first.")
-        exit(1)
+        print(f"[*] Baseline repository not found. Cloning into {BASELINE_DIR}...")
+        try:
+            subprocess.run(["git", "clone", "-q", ORIGINAL_REPO_URL, BASELINE_DIR], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"[!] Failed to clone baseline repository: {e}")
+            exit(1)
+    else:
+        print(f"[*] Baseline repository already exists...")
+
     try:
         fastutil = get_fastutil_path()
         shutil.copy(fastutil, os.path.join(BASELINE_DIR, fastutil))
