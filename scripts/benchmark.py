@@ -1,152 +1,33 @@
-"""
-MoSSo vs. Hybrid MoSSo Benchmark Runner.
-
-This script automates the performance evaluation between the original KDD '20
-MoSSo algorithm and the newly implemented Hybrid MoSSo (Mags-DM) algorithm.
-
-Usage Examples:
----------------
-1. Run the full remote dataset benchmark suite:
-   $ python3 benchmark/benchmark.py --mode remote
-
-2. Run a benchmark on a specific local graph file:
-   $ python3 benchmark/benchmark.py --mode local --file example_graph.txt
-
-Arguments:
-----------
---mode: (REQUIRED) 'remote' to download and run remote datasets, or 'local' for a custom file.
---file: (Conditional) Path to the local text file. Required if --mode is 'local'.
---skip-build: (Optional) Flag to skip Git cloning and Java compilation.
---samples: (Optional) Number of random neighbors to sample. Default is 120.
---escape: (Optional) Escape probability parameter for the MoSSo algorithm. Default is 3.
---interval: (Optional) Logging interval for the Java output. Default is 1000.
---runs: (Optional) See results over multiple runs to calculate averages.
---discard-summaries: (Optional) Throw away the generated summary graph files to save disk space.
-"""
-
 import argparse
 import subprocess
-import urllib.request
 import os
 import re
-import gzip
 import shutil
-import stat
 import pandas as pd
-import glob
 
 from plotter import plot_results, plot_runs_variance
+from utils import (
+    setup_directories, build_jars, download_and_prepare_dataset, prepare_local_dataset,
+    get_fastutil_path, BENCHMARK_DIR, RUNS_DIR, SUMMARIZED_DIR, JAR_ORIGINAL, JAR_HYBRID
+)
 
-# Configuration
-ORIGINAL_REPO_URL = "https://github.com/jihoonko/kdd20-mosso"
-DATASETS_DIR = "datasets"
-OUTPUT_DIR = "output"
-EXTERNAL_DIR = "external"
-BASELINE_DIR = os.path.join(EXTERNAL_DIR, "kdd20-mosso")
-BENCHMARK_DIR = os.path.join(OUTPUT_DIR, "benchmark")
-RUNS_DIR = os.path.join(BENCHMARK_DIR, "runs")
-SUMMARIZED_DIR = os.path.join(BENCHMARK_DIR, "summarized_graphs")
-JAR_ORIGINAL = "mosso-original.jar"
-JAR_HYBRID = "mosso-hybrid.jar"
-fastutil_files = glob.glob("fastutil-*.jar")
-FASTUTIL = fastutil_files[0] if fastutil_files else "fastutil-missing.jar"
-
-# Remote Datasets
+# Default Benchmarking Datasets
 datasets = {
     "small": [
         ("https://snap.stanford.edu/data/as-caida20071105.txt.gz", "as-caida20071105.txt"),
         ("https://snap.stanford.edu/data/email-Enron.txt.gz", "Email-Enron.txt"),
-        ("https://snap.stanford.edu/data/loc-brightkite_edges.txt.gz", "Brightkite_edges.txt")
+        ("https://snap.stanford.edu/data/loc-brightkite_edges.txt.gz", "Brightkite_edges.txt"),
+        ("https://snap.stanford.edu/data/email-EuAll.txt.gz", "Email-EuAll.txt"),
+        ("https://snap.stanford.edu/data/soc-Slashdot0902.txt.gz", "Slashdot0902.txt"),
+        ("https://snap.stanford.edu/data/bigdata/communities/com-dblp.ungraph.txt.gz", "com-dblp.ungraph.txt")
+    ],
+    "large": [
+        ("https://snap.stanford.edu/data/amazon0601.txt.gz", "amazon0601.txt"),
+        ("https://snap.stanford.edu/data/bigdata/communities/com-youtube.ungraph.txt.gz", "com-youtube.ungraph.txt"),
+        ("https://snap.stanford.edu/data/as-skitter.txt.gz", "as-skitter.txt"),
+        ("https://snap.stanford.edu/data/bigdata/communities/com-lj.ungraph.txt.gz", "com-lj.ungraph.txt")
     ]
 }
-
-def setup_directories():
-    if os.path.exists(BENCHMARK_DIR):
-        force_rmtree(BENCHMARK_DIR)
-
-    os.makedirs(DATASETS_DIR, exist_ok=True)
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    os.makedirs(BENCHMARK_DIR, exist_ok=True)
-    os.makedirs(EXTERNAL_DIR, exist_ok=True)
-    os.makedirs(RUNS_DIR, exist_ok=True)
-    os.makedirs(SUMMARIZED_DIR, exist_ok=True)
-
-def _on_rm_error(func, path, _):
-    try:
-        os.chmod(path, stat.S_IWRITE)
-        func(path)
-    except OSError:
-        pass
-
-def force_rmtree(path):
-    if os.path.exists(path):
-        shutil.rmtree(path, onerror=_on_rm_error)
-
-def build_original_jar():
-    print(f"\n[*] Cloning baseline repository to {BASELINE_DIR}...")
-    if os.name == "nt":
-        subprocess.run(["attrib", "-R", "-S", "-H", f"{BASELINE_DIR}\\*", "/S", "/D"], check=False)
-    if os.path.exists(BASELINE_DIR):
-        force_rmtree(BASELINE_DIR)
-    try:
-        subprocess.run(["git", "clone", ORIGINAL_REPO_URL, BASELINE_DIR],
-                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        shutil.copy(FASTUTIL, os.path.join(BASELINE_DIR, FASTUTIL))
-        print("[*] Compiling Original MoSSo...")
-        subprocess.run(["bash", "compile.sh"], cwd=BASELINE_DIR, check=True, stdout=subprocess.DEVNULL)
-        shutil.move(os.path.join(BASELINE_DIR, "mosso-1.0.jar"), JAR_ORIGINAL)
-        print(f"[*] Success! Saved as {JAR_ORIGINAL}")
-    except subprocess.CalledProcessError as e:
-        print(f"[!] Original compilation failed: {e}")
-        exit(1)
-
-def build_local_hybrid_jar():
-    print("\n[*] Compiling local Hybrid MoSSo code...")
-    try:
-        subprocess.run(["sh", "compile.sh"], check=True, stdout=subprocess.DEVNULL)
-        shutil.move("mosso-1.0.jar", JAR_HYBRID)
-        print(f"[*] Success! Saved as {JAR_HYBRID}")
-    except subprocess.CalledProcessError as e:
-        print(f"[!] Hybrid compilation failed: {e}")
-        exit(1)
-
-def build_jars(skip_build: bool):
-    if not os.path.exists(FASTUTIL):
-        print(f"[!] Error: {FASTUTIL} missing. Download it to root first.")
-        exit(1)
-
-    if not skip_build:
-        build_original_jar()
-    build_local_hybrid_jar()
-
-def download_and_prepare_dataset(url, filename):
-    gz_path = os.path.join(DATASETS_DIR, filename + ".gz")
-    txt_path = os.path.join(DATASETS_DIR, filename)
-    if not os.path.exists(txt_path):
-        if not os.path.exists(gz_path):
-            print(f"[*] Downloading {filename}...")
-            urllib.request.urlretrieve(url, gz_path)
-        print(f"[*] Converting {filename} to MoSSo format...")
-
-        seen_edges = set()
-
-        with gzip.open(gz_path, 'rt') as f_in, open(txt_path, 'w') as f_out:
-            for line in f_in:
-                if line.startswith('#'): continue
-                parts = line.strip().split()
-                if len(parts) >= 2:
-                    u, v = int(parts[0]), int(parts[1])
-
-                    if u == v: continue # Skip self-loops
-
-                    # Sort to ensure (1, 0) and (0, 1) are treated as the same undirected edge
-                    edge = tuple(sorted((u, v)))
-
-                    if edge not in seen_edges:
-                        seen_edges.add(edge)
-                        f_out.write(f"{u}\t{v}\t1\n")
-        os.remove(gz_path)
-    return txt_path
 
 def run_multiple_mosso(jar_file, dataset_path, output_name, samples, escape, interval, runs, discard_summaries, bCandidates=None):
     times = []
@@ -162,12 +43,13 @@ def run_multiple_mosso(jar_file, dataset_path, output_name, samples, escape, int
     return times, ratios
 
 def run_mosso(jar_file, dataset_path, output_name, samples, escape, interval, discard_summaries, bCandidates=None):
-    classpath = f"{FASTUTIL}{os.pathsep}{jar_file}"
+    classpath = f"{get_fastutil_path()}{os.pathsep}{jar_file}"
     out_file = os.path.join(RUNS_DIR, output_name)
     log_file = f"{out_file}.log"
 
     cmd = [
-        "java", "-cp", classpath, "mosso.Run",
+        "java",
+        "-cp", classpath, "mosso.Run",
         dataset_path,
         output_name,
         "mosso",
@@ -175,7 +57,7 @@ def run_mosso(jar_file, dataset_path, output_name, samples, escape, interval, di
         str(samples),
         str(interval)
     ]
-    
+
     if bCandidates is not None:
         cmd.append(str(bCandidates))
 
@@ -213,17 +95,20 @@ def run_mosso(jar_file, dataset_path, output_name, samples, escape, interval, di
         time_m = re.search(r"Execution time:\s*([\d.]+)s", output)
         ratio_m = re.search(r"Expected Compression Ratio:\s*([\d.]+)", output, re.IGNORECASE)
 
-        return float(time_m.group(1)) if time_m else None, float(ratio_m.group(1)) if ratio_m else None
+        t = float(time_m.group(1)) if time_m else None
+        r = float(ratio_m.group(1)) if ratio_m else None
+
+        return t, r
     except Exception as e:
         print(f"[!] Execution failed: {e}")
         return None, None
 
 def print_benchmark_summary(dataset_name, t_orig, t_hyb, r_orig, r_hyb, runs):
-    summary_lines = [f"\n" + "=" * 50, f" FINAL RESULTS: {dataset_name} (Average of {runs} runs)", "=" * 50]
+    summary_lines = [f"\n" + "=" * 60, f" FINAL RESULTS: {dataset_name} (Average of {runs} runs)", "=" * 60]
 
     if None in (t_orig, t_hyb, r_orig, r_hyb):
         summary_lines.append(" [!] One or more runs failed. Cannot calculate differences.")
-        summary_lines.append("="*50 + "\n")
+        summary_lines.append("="*60 + "\n")
     else:
         t_diff = t_orig - t_hyb
         t_pct = (t_diff / t_orig) * 100 if t_orig else 0
@@ -241,8 +126,9 @@ def print_benchmark_summary(dataset_name, t_orig, t_hyb, r_orig, r_hyb, runs):
         summary_lines.append(f" [Average Compression Ratio (Lower is Better)]")
         summary_lines.append(f"   - Original : {r_orig:.6f}")
         summary_lines.append(f"   - Hybrid   : {r_hyb:.6f}")
-        summary_lines.append(f"   -> Hybrid is {abs(r_diff):.6f} {r_status} ({abs(r_pct):.4f}%)")
-        summary_lines.append("="*50 + "\n")
+        summary_lines.append(f"   -> Hybrid is {abs(r_diff):.6f} {r_status} ({abs(r_pct):.4f}%)\n")
+
+        summary_lines.append("="*60 + "\n")
 
     summary_text = "\n".join(summary_lines)
     print(summary_text)
@@ -252,14 +138,13 @@ def print_benchmark_summary(dataset_name, t_orig, t_hyb, r_orig, r_hyb, runs):
         f.write(summary_text)
     print(f"[*] Summary report saved to {summary_file}")
 
-# --- Mode 1: Remote Benchmark ---
 def run_remote_suite(samples, escape, interval, runs, discard_summaries, bCandidates):
     results_file = os.path.join(BENCHMARK_DIR, "remote_results.csv")
     plot_file = os.path.join(BENCHMARK_DIR, "remote_comparison.pdf")
     results = []
 
     for category, data_list in datasets.items():
-        print(f"\n=== REMOTE CATEGORY: {category.upper()} ===")
+        print(f"\n=== BENCHMARK SUITE: {category.upper()} ===")
         for url, filename in data_list:
             dataset_name = filename.replace(".txt", "")
             path = download_and_prepare_dataset(url, filename)
@@ -272,11 +157,11 @@ def run_remote_suite(samples, escape, interval, runs, discard_summaries, bCandid
                 continue
 
             if runs > 1:
-                # Pass RUNS_DIR into the plotter function so it knows where to save!
                 plot_runs_variance(dataset_name, t1_list, t2_list, r1_list, r2_list, RUNS_DIR)
 
             t1_avg = sum(t1_list) / len(t1_list)
             r1_avg = sum(r1_list) / len(r1_list)
+
             t2_avg = sum(t2_list) / len(t2_list)
             r2_avg = sum(r2_list) / len(r2_list)
 
@@ -297,26 +182,29 @@ def run_local_suite(file_path, samples, escape, interval, runs, discard_summarie
         print(f"[!] Error: Cannot find file '{file_path}'")
         return
 
+    # Auto-prepare the local file for MoSSo formatting
+    prepared_path = prepare_local_dataset(file_path)
+
     filename = os.path.basename(file_path)
-    dataset_name = filename.replace(".txt", "")
-    results_file = os.path.join(BENCHMARK_DIR, f"local_{filename}_results.csv")
-    plot_file = os.path.join(BENCHMARK_DIR, f"local_{filename}_comparison.pdf")
+    dataset_name = filename.replace(".txt", "").replace(".csv", "")
+    results_file = os.path.join(BENCHMARK_DIR, f"local_{dataset_name}_results.csv")
+    plot_file = os.path.join(BENCHMARK_DIR, f"local_{dataset_name}_comparison.pdf")
 
     print(f"\n=== BENCHMARKING LOCAL FILE: {filename} ===")
 
-    t1_list, r1_list = run_multiple_mosso(JAR_ORIGINAL, file_path, f"orig_{dataset_name}", 120, 3, interval, runs, discard_summaries)
-    t2_list, r2_list = run_multiple_mosso(JAR_HYBRID, file_path, f"hyb_{dataset_name}", samples, escape, interval, runs, discard_summaries, bCandidates)
+    t1_list, r1_list = run_multiple_mosso(JAR_ORIGINAL, prepared_path, f"orig_{dataset_name}", 120, 3, interval, runs, discard_summaries)
+    t2_list, r2_list = run_multiple_mosso(JAR_HYBRID, prepared_path, f"hyb_{dataset_name}", samples, escape, interval, runs, discard_summaries, bCandidates)
 
     if not t1_list or not t2_list:
         print("[!] Not enough successful runs to generate summary.")
         return
 
     if runs > 1:
-        # Pass RUNS_DIR into the plotter function!
         plot_runs_variance(dataset_name, t1_list, t2_list, r1_list, r2_list, RUNS_DIR)
 
     t1_avg = sum(t1_list) / len(t1_list)
     r1_avg = sum(r1_list) / len(r1_list)
+
     t2_avg = sum(t2_list) / len(t2_list)
     r2_avg = sum(r2_list) / len(r2_list)
 
@@ -328,15 +216,15 @@ def run_local_suite(file_path, samples, escape, interval, runs, discard_summarie
         "Ratio_Original": r1_avg, "Ratio_Hybrid": r2_avg
     }])
     df.to_csv(results_file, index=False)
-
     plot_results(results_file, plot_file)
 
 def main():
     parser = argparse.ArgumentParser(description="MoSSo Graph Summarization Benchmarking Tool")
-    parser.add_argument("--mode", choices=["remote", "local"], required=True,
-                        help="Choose 'remote' to run the remote datasets, or 'local' for a specific file.")
+
+    # Mode is removed. --file is now optional.
     parser.add_argument("--file", type=str,
-                        help="Path to your local graph file (Required if mode is 'local')")
+                        help="Optional: Path to a specific local graph file. If omitted, runs the default dataset suite.")
+
     parser.add_argument("--skip-build", action="store_true",
                         help="Skip downloading and recompiling the Java JAR files.")
     parser.add_argument("--samples", type=int, default=120,
@@ -355,18 +243,13 @@ def main():
     args = parser.parse_args()
 
     build_jars(args.skip_build)
-
     setup_directories()
-
     discard = not args.keep_summaries
 
-    if args.mode == "remote":
-        run_remote_suite(args.samples, args.escape, args.interval, args.runs, discard, args.b)
-    elif args.mode == "local":
-        if not args.file:
-            print("[!] Error: You must provide a --file argument when using --mode local.")
-            return
+    if args.file:
         run_local_suite(args.file, args.samples, args.escape, args.interval, args.runs, discard, args.b)
+    else:
+        run_remote_suite(args.samples, args.escape, args.interval, args.runs, discard, args.b)
 
 if __name__ == "__main__":
     main()
