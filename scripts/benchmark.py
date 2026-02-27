@@ -29,19 +29,20 @@ datasets = {
     ]
 }
 
-def run_multiple_mosso(jar_file, dataset_path, output_name, samples, escape, interval, runs, discard_summaries):
-    times, ratios = [], []
+def run_multiple_mosso(jar_file, dataset_path, output_name, samples, escape, interval, runs, discard_summaries, bCandidates=None):
+    times = []
+    ratios = []
     for i in range(runs):
         if runs > 1:
             print(f"\n    [Iteration {i+1}/{runs}]")
-        t, r = run_mosso(jar_file, dataset_path, f"{output_name}_run{i+1}", samples, escape, interval, discard_summaries)
+        t, r = run_mosso(jar_file, dataset_path, f"{output_name}_run{i+1}", samples, escape, interval, discard_summaries, bCandidates)
         if t is not None and r is not None:
             times.append(t)
             ratios.append(r)
 
     return times, ratios
 
-def run_mosso(jar_file, dataset_path, output_name, samples, escape, interval, discard_summaries):
+def run_mosso(jar_file, dataset_path, output_name, samples, escape, interval, discard_summaries, bCandidates=None):
     classpath = f"{get_fastutil_path()}{os.pathsep}{jar_file}"
     out_file = os.path.join(RUNS_DIR, output_name)
     log_file = f"{out_file}.log"
@@ -56,6 +57,9 @@ def run_mosso(jar_file, dataset_path, output_name, samples, escape, interval, di
         str(samples),
         str(interval)
     ]
+
+    if bCandidates is not None:
+        cmd.append(str(bCandidates))
 
     print(f"    -> Running {jar_file}...")
     print(f"       (Saving logs to {log_file})")
@@ -134,7 +138,7 @@ def print_benchmark_summary(dataset_name, t_orig, t_hyb, r_orig, r_hyb, runs):
         f.write(summary_text)
     print(f"[*] Summary report saved to {summary_file}")
 
-def run_remote_suite(samples, escape, interval, runs, discard_summaries):
+def run_remote_suite(samples, escape, interval, runs, discard_summaries, bCandidates):
     results_file = os.path.join(BENCHMARK_DIR, "remote_results.csv")
     plot_file = os.path.join(BENCHMARK_DIR, "remote_comparison.pdf")
     results = []
@@ -146,7 +150,7 @@ def run_remote_suite(samples, escape, interval, runs, discard_summaries):
             path = download_and_prepare_dataset(url, filename)
 
             t1_list, r1_list = run_multiple_mosso(JAR_ORIGINAL, path, f"orig_{dataset_name}", 120, 3, interval, runs, discard_summaries)
-            t2_list, r2_list = run_multiple_mosso(JAR_HYBRID, path, f"hyb_{dataset_name}", samples, escape, interval, runs, discard_summaries)
+            t2_list, r2_list = run_multiple_mosso(JAR_HYBRID, path, f"hyb_{dataset_name}", samples, escape, interval, runs, discard_summaries, bCandidates)
 
             if not t1_list or not t2_list:
                 print("[!] Not enough successful runs to generate summary.")
@@ -172,7 +176,8 @@ def run_remote_suite(samples, escape, interval, runs, discard_summaries):
 
     plot_results(results_file, plot_file)
 
-def run_local_suite(file_path, samples, escape, interval, runs, discard_summaries):
+# --- Mode 2: Local File Benchmark ---
+def run_local_suite(file_path, samples, escape, interval, runs, discard_summaries, bCandidates):
     if not os.path.exists(file_path):
         print(f"[!] Error: Cannot find file '{file_path}'")
         return
@@ -188,7 +193,7 @@ def run_local_suite(file_path, samples, escape, interval, runs, discard_summarie
     print(f"\n=== BENCHMARKING LOCAL FILE: {filename} ===")
 
     t1_list, r1_list = run_multiple_mosso(JAR_ORIGINAL, prepared_path, f"orig_{dataset_name}", 120, 3, interval, runs, discard_summaries)
-    t2_list, r2_list = run_multiple_mosso(JAR_HYBRID, prepared_path, f"hyb_{dataset_name}", samples, escape, interval, runs, discard_summaries)
+    t2_list, r2_list = run_multiple_mosso(JAR_HYBRID, prepared_path, f"hyb_{dataset_name}", samples, escape, interval, runs, discard_summaries, bCandidates)
 
     if not t1_list or not t2_list:
         print("[!] Not enough successful runs to generate summary.")
@@ -226,6 +231,8 @@ def main():
                         help="Number of random neighbors to sample (Default: 120)")
     parser.add_argument("--escape", type=int, default=3,
                         help="Escape probability parameter (Default: 3)")
+    parser.add_argument("--b", type=int, default=5,
+                        help="Number of top candidates to consider (Default: 5)")
     parser.add_argument("--interval", type=int, default=1000,
                         help="How often the Java code prints progress (Default: 1000)")
     parser.add_argument("--runs", type=int, default=1,
@@ -240,9 +247,9 @@ def main():
     discard = not args.keep_summaries
 
     if args.file:
-        run_local_suite(args.file, args.samples, args.escape, args.interval, args.runs, discard)
+        run_local_suite(args.file, args.samples, args.escape, args.interval, args.runs, discard, args.b)
     else:
-        run_remote_suite(args.samples, args.escape, args.interval, args.runs, discard)
+        run_remote_suite(args.samples, args.escape, args.interval, args.runs, discard, args.b)
 
 if __name__ == "__main__":
     main()
