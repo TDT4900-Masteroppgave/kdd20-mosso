@@ -99,13 +99,36 @@ def download_and_prepare_dataset(url, filename):
         if not os.path.exists(gz_path):
             print(f"[*] Downloading {filename}...")
             urllib.request.urlretrieve(url, gz_path)
-        print(f"[*] Converting {filename} to MoSSo format...")
+
+        print(f"[*] Converting {filename} (Undirected, No Self-Loops, No Multi-Edges)...")
+
+        seen_edges = set()
+
         with gzip.open(gz_path, 'rt') as f_in, open(txt_path, 'w') as f_out:
             for line in f_in:
                 if line.startswith('#'): continue
                 parts = line.strip().split()
                 if len(parts) >= 2:
-                    f_out.write(f"{parts[0]}\t{parts[1]}\t1\n")
+                    try:
+                        u, v = int(parts[0]), int(parts[1])
+                    except ValueError:
+                        continue
+
+                    # 1. Remove self-loops (as per MoSSo paper)
+                    if u == v:
+                        continue
+
+                        # 2. Ignore direction & remove multiple edges (as per MoSSo paper)
+                    # Sorting (u, v) treats (src, dst) and (dst, src) as the same edge
+                    edge = tuple(sorted((u, v)))
+                    if edge in seen_edges:
+                        continue
+                    seen_edges.add(edge)
+
+                    # 3. Write using original IDs
+                    f_out.write(f"{u}\t{v}\t1\n")
+
+        print(f"[*] Ready: {len(seen_edges):,} unique undirected edges.")
         os.remove(gz_path)
     return txt_path
 
@@ -113,13 +136,30 @@ def prepare_local_dataset(filepath):
     filename = os.path.basename(filepath)
     prepared_path = os.path.join(DATASETS_DIR, f"prepared_{filename}")
 
-    print(f"[*] Converting local file {filename} to MoSSo format...")
+    print(f"[*] Cleaning local file {filename} (Undirected, No Self-Loops, No Multi-Edges)...")
+
+    seen_edges = set()
+
     with open(filepath, 'r') as f_in, open(prepared_path, 'w') as f_out:
         for line in f_in:
             if line.startswith('#'): continue
             parts = line.strip().split()
             if len(parts) >= 2:
-                # Enforce the MoSSo format (Node1 \t Node2 \t 1)
-                f_out.write(f"{parts[0]}\t{parts[1]}\t1\n")
+                try:
+                    u, v = int(parts[0]), int(parts[1])
+                except ValueError:
+                    continue
 
+                if u == v:
+                    continue
+
+                edge = tuple(sorted((u, v)))
+                if edge in seen_edges:
+                    continue
+                seen_edges.add(edge)
+
+                # Write using original IDs
+                f_out.write(f"{u}\t{v}\t1\n")
+
+    print(f"[*] Ready: {len(seen_edges):,} unique undirected edges.")
     return prepared_path
