@@ -63,3 +63,57 @@ def plot_runs_variance(dataset_name, orig_times, hyb_times, orig_ratios, hyb_rat
     plt.savefig(plot_file)
     print(f"[*] Variance line-plot saved to {plot_file}")
     plt.close()
+
+def plot_parameter_analysis(csv_file, param_name, plot_file):
+    """
+    Generates a parameter sensitivity plot mimicking Figure 6 of the MoSSo paper.
+    """
+    df = pd.read_csv(csv_file)
+    if df.empty:
+        print("[!] No data to plot.")
+        return
+
+    # Create 1 row, 2 columns for Ratio and Time (like the paper)
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    datasets = df['Dataset'].unique()
+    markers = ['o', 's', '^', 'D', 'v']
+    colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6']
+
+    # Subplot 1: Compression Ratio
+    for i, dataset in enumerate(datasets):
+        subset = df[df['Dataset'] == dataset].sort_values(by=param_name)
+        axes[0].plot(subset[param_name], subset['Ratio_Hybrid'],
+                     marker=markers[i % len(markers)], color=colors[i % len(colors)],
+                     linestyle='-', linewidth=2, markersize=8, label=f'{dataset} (Hybrid)')
+
+        # Plot Original Baseline as a dashed line for reference
+        orig_avg = subset['Ratio_Original'].mean()
+        axes[0].axhline(y=orig_avg, linestyle='--', color=colors[i % len(colors)], alpha=0.5)
+
+    axes[0].set_title(f"Effects of {param_name.capitalize()}", fontsize=14)
+    axes[0].set_xlabel(param_name.capitalize(), fontsize=12)
+    axes[0].set_ylabel("Compression Ratio", fontsize=12)
+    axes[0].grid(True, linestyle=':', alpha=0.6)
+    axes[0].legend(fontsize=10)
+
+    # Subplot 2: Execution Time
+    for i, dataset in enumerate(datasets):
+        subset = df[df['Dataset'] == dataset].sort_values(by=param_name)
+        axes[1].plot(subset[param_name], subset['Time_Hybrid'],
+                     marker=markers[i % len(markers)], color=colors[i % len(colors)],
+                     linestyle='-', linewidth=2, markersize=8, label=f'{dataset} (Hybrid)')
+
+        orig_time = subset['Time_Original'].mean()
+        axes[1].axhline(y=orig_time, linestyle='--', color=colors[i % len(colors)], alpha=0.5)
+
+    axes[1].set_title(f"Scalability of {param_name.capitalize()}", fontsize=14)
+    axes[1].set_xlabel(param_name.capitalize(), fontsize=12)
+    axes[1].set_ylabel("Execution Time (sec)", fontsize=12)
+    axes[1].grid(True, linestyle=':', alpha=0.6)
+    axes[1].legend(fontsize=10)
+
+    plt.tight_layout()
+    plt.savefig(plot_file)
+    print(f"[*] Parameter analysis plot saved to {plot_file}")
+    plt.close()
