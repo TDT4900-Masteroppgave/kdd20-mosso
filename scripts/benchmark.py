@@ -47,7 +47,10 @@ def run_mosso(jar_file, dataset_path, output_name, samples, escape, interval, di
     log_file = f"{out_file}.log"
 
     cmd = [
-        "java", "-cp", classpath, "mosso.Run",
+        "java",
+        "-Xmx2g",  # LIMIT RAM TO 2GB (Prevents server swap freezing)
+        "-Djava.security.egd=file:/dev/./urandom",  # PREVENT ENTROPY HANG
+        "-cp", classpath, "mosso.Run",
         dataset_path,
         output_name,
         "mosso",
