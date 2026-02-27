@@ -91,7 +91,7 @@ def plot_parameter_analysis(csv_file, param_name, plot_file):
         orig_avg = subset['Ratio_Original'].mean()
         axes[0].axhline(y=orig_avg, linestyle='--', color=colors[i % len(colors)], alpha=0.5)
 
-    axes[0].set_title(f"Effects of {param_name.capitalize()}", fontsize=14)
+    axes[0].set_title(f"Compression of {param_name.capitalize()}", fontsize=14)
     axes[0].set_xlabel(param_name.capitalize(), fontsize=12)
     axes[0].set_ylabel("Compression Ratio", fontsize=12)
     axes[0].grid(True, linestyle=':', alpha=0.6)
@@ -107,7 +107,7 @@ def plot_parameter_analysis(csv_file, param_name, plot_file):
         orig_time = subset['Time_Original'].mean()
         axes[1].axhline(y=orig_time, linestyle='--', color=colors[i % len(colors)], alpha=0.5)
 
-    axes[1].set_title(f"Scalability of {param_name.capitalize()}", fontsize=14)
+    axes[1].set_title(f"Execution Time of {param_name.capitalize()}", fontsize=14)
     axes[1].set_xlabel(param_name.capitalize(), fontsize=12)
     axes[1].set_ylabel("Execution Time (sec)", fontsize=12)
     axes[1].grid(True, linestyle=':', alpha=0.6)
