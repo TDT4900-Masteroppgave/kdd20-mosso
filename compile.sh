@@ -1,17 +1,28 @@
-echo compiling java sources...
-rm -rf class
-rm -rf output
-mkdir class
-mkdir output
+#!/bin/bash
+set -e
 
-javac -cp ./fastutil-8.2.2.jar -d class $(find ./src -name *.java)
+echo "[*] Compiling Java sources..."
 
-echo make jar archive
+rm -rf class mosso-1.0.jar
+mkdir -p class
+
+# shellcheck disable=SC2012
+FASTUTIL_JAR=$(ls fastutil-*.jar 2>/dev/null | head -n 1)
+
+if [ -z "$FASTUTIL_JAR" ]; then
+    echo "[!] Error: fastutil JAR not found in the current directory."
+    exit 1
+fi
+
+# shellcheck disable=SC2046
+javac -cp "./$FASTUTIL_JAR" -d class $(find ./src -name "*.java")
+
+echo "[*] Creating JAR archive..."
 cd class
 jar cf mosso-1.0.jar ./
-rm ../mosso-1.0.jar
 mv mosso-1.0.jar ../
 cd ..
+
 rm -rf class
 
-echo done.
+echo "[*] Build complete: mosso-1.0.jar"
