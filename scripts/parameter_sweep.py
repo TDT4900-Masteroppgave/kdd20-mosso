@@ -1,8 +1,7 @@
 import argparse
 import pandas as pd
 from config import *
-from logger import setup_logging
-from utils import setup_directories, build_jars, download_and_prepare_dataset, prepare_dataset
+from utils import setup_logging, setup_directories, build_jars, download_and_prepare_dataset, prepare_dataset
 from run_mosso import run_multiple_mosso
 from plotter import plot_parameter_analysis
 
