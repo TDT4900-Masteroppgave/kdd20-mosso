@@ -7,7 +7,7 @@ from run_mosso import run_multiple_mosso
 from plotter import plot_parameter_analysis
 
 SWEEP_CONFIG = {
-    "samples": {"values": [i for i in range(10, 30, 10)], "default": 120},
+    "samples": {"values": [i for i in range(10, 240, 10)], "default": 120},
     "escape": {"values": [i for i in range(1, 9, 2)], "default": 3},
     "b": {"values": [1, 3, 5, 7, 10], "default": 5}
 }
