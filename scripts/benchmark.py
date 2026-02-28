@@ -1,8 +1,7 @@
 import argparse
 import pandas as pd
 from config import *
-from logger import setup_logging
-from utils import setup_directories, build_jars, download_and_prepare_dataset, prepare_dataset
+from utils import setup_logging, setup_directories, build_jars, download_and_prepare_dataset, prepare_dataset
 from run_mosso import run_multiple_mosso
 from plotter import plot_results, plot_runs_variance
 
@@ -10,7 +9,6 @@ def print_summary_table(results, logger):
     if not results: return
     df = pd.DataFrame(results)
 
-    # Calculate average row
     avg_row = df.mean(numeric_only=True).to_dict()
     avg_row['Dataset'] = 'AVERAGE'
     df = pd.concat([df, pd.DataFrame([avg_row])], ignore_index=True)
@@ -48,7 +46,7 @@ def run_suite(args, file_path, logger):
             for url, filename in data_list:
                 datasets_to_run.append((url, filename))
 
-    total_datasets = len(datasets_to_run) # Get total count for the progress indicator
+    total_datasets = len(datasets_to_run)
 
     for i, (url, filename) in enumerate(datasets_to_run, 1):
         dataset_name = filename.replace(".txt", "").replace(".csv", "")
