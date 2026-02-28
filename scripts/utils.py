@@ -132,7 +132,6 @@ def setup_logging(run_type="benchmark"):
     logger.addHandler(ch)
     logger.addHandler(fh)
 
-    # Intercept uncaught exceptions and log them
     def handle_exception(exc_type, exc_value, exc_traceback):
         if issubclass(exc_type, KeyboardInterrupt):
             logger.warning("\n[!] Execution interrupted by user (KeyboardInterrupt).")

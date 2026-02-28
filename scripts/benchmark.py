@@ -9,7 +9,6 @@ def print_summary_table(results, logger):
     if not results: return
     df = pd.DataFrame(results)
 
-    # Calculate average row
     avg_row = df.mean(numeric_only=True).to_dict()
     avg_row['Dataset'] = 'AVERAGE'
     df = pd.concat([df, pd.DataFrame([avg_row])], ignore_index=True)
@@ -47,7 +46,7 @@ def run_suite(args, file_path, logger):
             for url, filename in data_list:
                 datasets_to_run.append((url, filename))
 
-    total_datasets = len(datasets_to_run) # Get total count for the progress indicator
+    total_datasets = len(datasets_to_run)
 
     for i, (url, filename) in enumerate(datasets_to_run, 1):
         dataset_name = filename.replace(".txt", "").replace(".csv", "")
