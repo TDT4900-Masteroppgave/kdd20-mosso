@@ -10,7 +10,7 @@ BENCHMARK_DIR = os.path.join(OUTPUT_DIR, "benchmark")
 RUNS_DIR = os.path.join(BENCHMARK_DIR, "runs")
 SUMMARIZED_DIR = os.path.join(BENCHMARK_DIR, "summarized_graphs")
 SWEEP_DIR = os.path.join(OUTPUT_DIR, "parameter_sweep")
-LOG_DIR = os.path.join(BENCHMARK_DIR, "logs")
+LOG_DIR = os.path.join(OUTPUT_DIR, "logs")
 
 JAR_ORIGINAL = "mosso-original.jar"
 JAR_HYBRID = "mosso-hybrid.jar"
@@ -31,4 +31,10 @@ DATASETS = {
         ("https://snap.stanford.edu/data/as-skitter.txt.gz", "as-skitter.txt"),
         ("https://snap.stanford.edu/data/bigdata/communities/com-lj.ungraph.txt.gz", "com-lj.ungraph.txt")
     ]
+}
+
+SWEEP_CONFIG = {
+    "samples": {"values": [i for i in range(10, 20, 10)], "default": 120},
+    "escape": {"values": [i for i in range(1, 9, 2)], "default": 3},
+    "b": {"values": [i for i in range(1, 10, 2)], "default": 5}
 }

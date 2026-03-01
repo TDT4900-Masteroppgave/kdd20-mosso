@@ -1,8 +1,7 @@
 import argparse
 import pandas as pd
 from config import *
-from logger import setup_logging
-from utils import setup_directories, build_jars, download_and_prepare_dataset, prepare_dataset
+from utils import setup_logging, setup_directories, build_jars, download_and_prepare_dataset, prepare_dataset
 from run_mosso import run_multiple_mosso
 from plotter import plot_results, plot_runs_variance
 
@@ -10,7 +9,6 @@ def print_summary_table(results, logger):
     if not results: return
     df = pd.DataFrame(results)
 
-    # Calculate average row
     avg_row = df.mean(numeric_only=True).to_dict()
     avg_row['Dataset'] = 'AVERAGE'
     df = pd.concat([df, pd.DataFrame([avg_row])], ignore_index=True)
@@ -48,7 +46,14 @@ def run_suite(args, file_path, logger):
             for url, filename in data_list:
                 datasets_to_run.append((url, filename))
 
-    total_datasets = len(datasets_to_run) # Get total count for the progress indicator
+    total_datasets = len(datasets_to_run)
+
+    # ==========================================
+    # STAGE 2: PROCESSING
+    # ==========================================
+    logger.info("\n" + "="*60)
+    logger.info(f"{'STAGE 2: BENCHMARK PROCESSING':^60}")
+    logger.info("="*60)
 
     for i, (url, filename) in enumerate(datasets_to_run, 1):
         dataset_name = filename.replace(".txt", "").replace(".csv", "")
@@ -64,12 +69,10 @@ def run_suite(args, file_path, logger):
 
         logger.info(f"\n[{i}/{total_datasets}] Benchmarking [{dataset_name}] ({args.runs} runs) ...")
 
-        # Run Original
         logger.debug("   Running Original...")
         t1_avg, r1_avg, t1_list, r1_list = run_multiple_mosso(
             JAR_ORIGINAL, path, f"orig_{dataset_name}", 120, 3, args.interval, args.runs, not args.keep_summaries, logger)
 
-        # Run Hybrid
         logger.debug("   Running Hybrid...")
         t2_avg, r2_avg, t2_list, r2_list = run_multiple_mosso(
             JAR_HYBRID, path, f"hyb_{dataset_name}", args.samples, args.escape, args.interval, args.runs, not args.keep_summaries, logger, args.b)
@@ -92,13 +95,20 @@ def run_suite(args, file_path, logger):
         if args.runs > 1:
             plot_runs_variance(dataset_name, t1_list, t2_list, r1_list, r2_list, RUNS_DIR, logger)
 
+    # ==========================================
+    # STAGE 3: RESULTS
+    # ==========================================
+    logger.info("\n" + "="*60)
+    logger.info(f"{'STAGE 3: RESULTS & ARTIFACTS':^60}")
+    logger.info("="*60)
+
     print_summary_table(results, logger)
 
     if results:
         csv_file = os.path.join(BENCHMARK_DIR, "results.csv")
         pd.DataFrame(results).to_csv(csv_file, index=False)
         plot_results(csv_file, os.path.join(BENCHMARK_DIR, "comparison.pdf"), logger)
-        logger.info(f"[*] Artifacts saved to {BENCHMARK_DIR}")
+        logger.info(f"[*] Artifacts successfully saved to: {BENCHMARK_DIR}")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -113,10 +123,18 @@ def main():
 
     args = parser.parse_args()
     logger, log_file = setup_logging("benchmark")
+
+    # ==========================================
+    # STAGE 1: SETUP
+    # ==========================================
+    logger.info("\n" + "="*60)
+    logger.info(f"{'STAGE 1: SETUP & COMPILATION':^60}")
+    logger.info("="*60)
     logger.info(f"[*] Log initialized: {log_file}")
 
     setup_directories()
     build_jars(args.skip_build, logger)
+
     run_suite(args, args.file, logger)
 
 if __name__ == "__main__":
