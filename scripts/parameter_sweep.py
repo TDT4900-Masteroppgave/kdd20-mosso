@@ -67,7 +67,13 @@ def run_sweep(args, logger):
 
     total_datasets = len(datasets_to_run)
 
-    sweep_values = args.values if args.values else config["values"]
+    if args.range:
+        start, stop, step = args.range
+        sweep_values = list(range(start, stop + 1, step))
+    elif args.values:
+        sweep_values = args.values
+    else:
+        sweep_values = config["values"]
 
     # ==========================================
     # STAGE 2: PROCESSING
@@ -145,6 +151,8 @@ def main():
     parser.add_argument("--runs", type=int, default=1)
     parser.add_argument("--skip-build", action="store_true")
 
+    parser.add_argument("--range", type=int, nargs=3, metavar=('START', 'STOP', 'STEP'),
+                        help="Generate a range of values to test (e.g., --range 10 100 10)")
     parser.add_argument("--values", type=int, nargs='+', help="Specific values to test (e.g., --values 10 50 100)")
 
     parser.add_argument("--samples", type=int, default=SWEEP_CONFIG["samples"]["default"])
