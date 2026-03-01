@@ -67,18 +67,20 @@ def run_sweep(args, logger):
 
     total_datasets = len(datasets_to_run)
 
+    sweep_values = args.values if args.values else config["values"]
+
     # ==========================================
     # STAGE 2: PROCESSING
     # ==========================================
     logger.info("\n" + "="*60)
     logger.info(f"{'STAGE 2: PARAMETER SWEEP PROCESSING':^60}")
     logger.info("="*60)
-    logger.info(f"[*] Starting Sweep for: {param.upper()} over {len(config['values'])} values.")
+    logger.info(f"[*] Starting Sweep for: {param.upper()} over {len(sweep_values)} values.")
 
-    for val in config["values"]:
+    for val in sweep_values:
         logger.info(f"\n--- Testing {param.upper()} = {val} ---")
 
-        # Determine current parameters using user arguments as fallbacks!
+        # Determine current parameters using user arguments as fallbacks
         samples = val if param == "samples" else args.samples
         escape = val if param == "escape" else args.escape
         b_cand = val if param == "b" else args.b
@@ -97,7 +99,6 @@ def run_sweep(args, logger):
 
             logger.info(f"\n[{i}/{total_datasets}] Running {dataset_name} ({args.runs} runs) ...")
 
-            # I also updated these to use args.interval instead of hardcoding 1000
             logger.debug("   Running Original...")
             t1, r1, _, _ = run_multiple_mosso(JAR_ORIGINAL, path, f"orig_{dataset_name}_{param}{val}", 120, 3, args.interval, args.runs, True, logger)
 
@@ -143,6 +144,8 @@ def main():
     parser.add_argument("--file", type=str)
     parser.add_argument("--runs", type=int, default=1)
     parser.add_argument("--skip-build", action="store_true")
+
+    parser.add_argument("--values", type=int, nargs='+', help="Specific values to test (e.g., --values 10 50 100)")
 
     parser.add_argument("--samples", type=int, default=SWEEP_CONFIG["samples"]["default"])
     parser.add_argument("--escape", type=int, default=SWEEP_CONFIG["escape"]["default"])
