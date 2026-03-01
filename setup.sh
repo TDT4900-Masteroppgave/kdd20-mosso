@@ -22,7 +22,7 @@ fi
 source .venv/bin/activate
 
 # Install Python Dependencies
-pip install -q -r requirements.txt
+pip install -q -r requirements.txt --disable-pip-version-check
 
 # Download fastutil (with corruption protection)
 FASTUTIL_VER="8.2.2"
