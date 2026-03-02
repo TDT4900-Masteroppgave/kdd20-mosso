@@ -15,7 +15,7 @@ def print_sweep_summary_table(results, param_name, logger):
     header = f"| {'Dataset':<18} | {param_name.upper():<9} | {'Orig Time(s)':<12} | {'Hyb Time(s)':<12} | {'Time Diff':<10} | {'Orig Ratio':<10} | {'Hyb Ratio':<10} | {'Ratio Diff':<10} |"
     sep = "-" * len(header)
 
-    logger.info(f"\n{sep}")
+    logger.info(f"{sep}")
     logger.info(f"| {f'FINAL SWEEP SUMMARY: {param_name.upper()}':^{len(header)-4}} |")
     logger.info(f"{sep}")
     logger.info(header)
@@ -54,7 +54,7 @@ def print_sweep_summary_table(results, param_name, logger):
 
         logger.info(f"| {'ALL (Avg)':<18} | {p_val:<9} | {t_o:<12} | {t_h:<12} | {t_d:<10} | {r_o:<10} | {r_h:<10} | {r_d:<10} |")
 
-    logger.info(f"{sep}\n")
+    logger.info(f"{sep}")
 
 def run_sweep(args, logger, timestamp):
     param = args.param
@@ -82,19 +82,20 @@ def run_sweep(args, logger, timestamp):
     # ==========================================
     # STAGE 2: PROCESSING
     # ==========================================
-    logger.info("\n" + "="*60)
+    logger.info("="*60)
     logger.info(f"{'STAGE 2: PARAMETER SWEEP PROCESSING':^60}")
     logger.info("="*60)
     logger.info(f"[*] Starting Sweep for: {param.upper()} over {len(sweep_values)} values.")
 
     for val in sweep_values:
-        logger.info(f"\n--- Testing {param.upper()} = {val} ---")
+        logger.info(f"--- Testing {param.upper()} = {val} ---")
 
         samples = val if param == "samples" else args.samples
         escape = val if param == "escape" else args.escape
         b_cand = val if param == "b" else args.b
 
         for i, (url, filename) in enumerate(datasets_to_run, 1):
+            # ... (Keep your existing dataset running logic exactly as it is) ...
             dataset_name = filename.replace(".txt", "").replace(".csv", "")
 
             if url == "local":
@@ -103,10 +104,10 @@ def run_sweep(args, logger, timestamp):
                 path = download_and_prepare_dataset(url, filename, logger)
 
             if not path:
-                logger.warning(f"\n[{i}/{total_datasets}] [!] Skipping {dataset_name} because preparation failed.")
+                logger.warning(f"[{i}/{total_datasets}] [!] Skipping {dataset_name} because preparation failed.")
                 continue
 
-            logger.info(f"\n[{i}/{total_datasets}] Running {dataset_name} ({args.runs} runs) ...")
+            logger.info(f"[{i}/{total_datasets}] Running {dataset_name} ({args.runs} runs) ...")
 
             logger.debug("   Running Original...")
             t1, r1, _, _ = run_multiple_mosso(JAR_ORIGINAL, path, f"orig_{dataset_name}_{param}{val}_{timestamp}", 120, 3, args.interval, args.runs, True, logger)
@@ -129,24 +130,26 @@ def run_sweep(args, logger, timestamp):
                 "Ratio_Original": r1, "Ratio_Hybrid": r2
             })
 
+        # --- NEW: INCREMENTAL SAVING ---
+        # After testing all datasets for this specific 'val', update the files immediately!
+        if all_results:
+            current_df = pd.DataFrame(all_results)
+            master_csv = os.path.join(SWEEP_DIR, f"sweep_{param}_results_{timestamp}.csv")
+            current_df.to_csv(master_csv, index=False)
+
+            plot_output = os.path.join(SWEEP_DIR, f"sweep_{param}_plot_{timestamp}.pdf")
+            plot_parameter_analysis(master_csv, param, plot_output, logger)
+
     # ==========================================
     # STAGE 3: RESULTS
     # ==========================================
-    logger.info("\n" + "="*60)
+    logger.info("="*60)
     logger.info(f"{'STAGE 3: RESULTS & ARTIFACTS':^60}")
     logger.info("="*60)
 
     if all_results:
         print_sweep_summary_table(all_results, param, logger)
-
-        final_df = pd.DataFrame(all_results)
-        master_csv = os.path.join(SWEEP_DIR, f"sweep_{param}_results_{timestamp}.csv")
-        final_df.to_csv(master_csv, index=False)
-
-        plot_output = os.path.join(SWEEP_DIR, f"sweep_{param}_plot_{timestamp}.pdf")
-        plot_parameter_analysis(master_csv, param, plot_output, logger)
-
-        logger.info(f"[*] Sweep complete! Artifacts saved to: {SWEEP_DIR}")
+        logger.info(f"[*] Sweep complete! Artifacts saved incrementally to: {SWEEP_DIR}")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -173,7 +176,7 @@ def main():
     # ==========================================
     # STAGE 1: SETUP
     # ==========================================
-    logger.info("\n" + "="*60)
+    logger.info("="*60)
     logger.info(f"{'STAGE 1: SETUP & COMPILATION':^60}")
     logger.info("="*60)
     logger.info(f"[*] Log initialized: {log_file}")
