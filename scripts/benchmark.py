@@ -37,7 +37,7 @@ def print_summary_table(results, logger):
 
     logger.info(f"{sep}\n")
 
-def run_suite(args, file_path, logger):
+def run_suite(args, file_path, logger, timestamp):
     results = []
     datasets_to_run = [("local", file_path)] if file_path else []
 
@@ -71,11 +71,11 @@ def run_suite(args, file_path, logger):
 
         logger.debug("   Running Original...")
         t1_avg, r1_avg, t1_list, r1_list = run_multiple_mosso(
-            JAR_ORIGINAL, path, f"orig_{dataset_name}", 120, 3, args.interval, args.runs, not args.keep_summaries, logger)
+            JAR_ORIGINAL, path, f"orig_{dataset_name}_{timestamp}", 120, 3, args.interval, args.runs, not args.keep_summaries, logger)
 
         logger.debug("   Running Hybrid...")
         t2_avg, r2_avg, t2_list, r2_list = run_multiple_mosso(
-            JAR_HYBRID, path, f"hyb_{dataset_name}", args.samples, args.escape, args.interval, args.runs, not args.keep_summaries, logger, args.b)
+            JAR_HYBRID, path, f"hyb_{dataset_name}_{timestamp}", args.samples, args.escape, args.interval, args.runs, not args.keep_summaries, logger, args.b)
 
         if None in (t1_avg, t2_avg):
             logger.warning(f"   [!] Skipped {dataset_name} due to execution failure.")
@@ -93,7 +93,7 @@ def run_suite(args, file_path, logger):
         })
 
         if args.runs > 1:
-            plot_runs_variance(dataset_name, t1_list, t2_list, r1_list, r2_list, RUNS_DIR, logger)
+            plot_runs_variance(f"{dataset_name}_{timestamp}", t1_list, t2_list, r1_list, r2_list, RUNS_DIR, logger)
 
     # ==========================================
     # STAGE 3: RESULTS
@@ -105,9 +105,12 @@ def run_suite(args, file_path, logger):
     print_summary_table(results, logger)
 
     if results:
-        csv_file = os.path.join(BENCHMARK_DIR, "results.csv")
+        csv_file = os.path.join(BENCHMARK_DIR, f"results_{timestamp}.csv")
         pd.DataFrame(results).to_csv(csv_file, index=False)
-        plot_results(csv_file, os.path.join(BENCHMARK_DIR, "comparison.pdf"), logger)
+
+        plot_file = os.path.join(BENCHMARK_DIR, f"comparison_{timestamp}.pdf")
+        plot_results(csv_file, plot_file, logger)
+
         logger.info(f"[*] Artifacts successfully saved to: {BENCHMARK_DIR}")
 
 def main():
@@ -122,7 +125,8 @@ def main():
     parser.add_argument("--keep-summaries", action="store_true")
 
     args = parser.parse_args()
-    logger, log_file = setup_logging("benchmark")
+
+    logger, log_file, timestamp = setup_logging("benchmark")
 
     # ==========================================
     # STAGE 1: SETUP
@@ -135,7 +139,7 @@ def main():
     setup_directories()
     build_jars(args.skip_build, logger)
 
-    run_suite(args, args.file, logger)
+    run_suite(args, args.file, logger, timestamp)
 
 if __name__ == "__main__":
     main()

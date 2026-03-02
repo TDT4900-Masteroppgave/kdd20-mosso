@@ -56,7 +56,7 @@ def print_sweep_summary_table(results, param_name, logger):
 
     logger.info(f"{sep}\n")
 
-def run_sweep(args, logger):
+def run_sweep(args, logger, timestamp):
     param = args.param
     config = SWEEP_CONFIG[param]
     all_results = []
@@ -86,7 +86,6 @@ def run_sweep(args, logger):
     for val in sweep_values:
         logger.info(f"\n--- Testing {param.upper()} = {val} ---")
 
-        # Determine current parameters using user arguments as fallbacks
         samples = val if param == "samples" else args.samples
         escape = val if param == "escape" else args.escape
         b_cand = val if param == "b" else args.b
@@ -106,10 +105,10 @@ def run_sweep(args, logger):
             logger.info(f"\n[{i}/{total_datasets}] Running {dataset_name} ({args.runs} runs) ...")
 
             logger.debug("   Running Original...")
-            t1, r1, _, _ = run_multiple_mosso(JAR_ORIGINAL, path, f"orig_{dataset_name}_{param}{val}", 120, 3, args.interval, args.runs, True, logger)
+            t1, r1, _, _ = run_multiple_mosso(JAR_ORIGINAL, path, f"orig_{dataset_name}_{param}{val}_{timestamp}", 120, 3, args.interval, args.runs, True, logger)
 
             logger.debug("   Running Hybrid...")
-            t2, r2, _, _ = run_multiple_mosso(JAR_HYBRID, path, f"hyb_{dataset_name}_{param}{val}", samples, escape, args.interval, args.runs, True, logger, b_cand)
+            t2, r2, _, _ = run_multiple_mosso(JAR_HYBRID, path, f"hyb_{dataset_name}_{param}{val}_{timestamp}", samples, escape, args.interval, args.runs, True, logger, b_cand)
 
             if None in (t1, t2):
                 logger.warning(f"   [!] Skipped {dataset_name} due to execution failure.")
@@ -137,11 +136,12 @@ def run_sweep(args, logger):
         print_sweep_summary_table(all_results, param, logger)
 
         final_df = pd.DataFrame(all_results)
-        master_csv = os.path.join(SWEEP_DIR, f"sweep_{param}_results.csv")
+        master_csv = os.path.join(SWEEP_DIR, f"sweep_{param}_results_{timestamp}.csv")
         final_df.to_csv(master_csv, index=False)
 
-        plot_output = os.path.join(SWEEP_DIR, f"sweep_{param}_plot.pdf")
+        plot_output = os.path.join(SWEEP_DIR, f"sweep_{param}_plot_{timestamp}.pdf")
         plot_parameter_analysis(master_csv, param, plot_output, logger)
+
         logger.info(f"[*] Sweep complete! Artifacts saved to: {SWEEP_DIR}")
 
 def main():
@@ -161,7 +161,8 @@ def main():
     parser.add_argument("--interval", type=int, default=1000)
 
     args = parser.parse_args()
-    logger, log_file = setup_logging(f"sweep_{args.param}")
+
+    logger, log_file, timestamp = setup_logging(f"sweep_{args.param}")
 
     # ==========================================
     # STAGE 1: SETUP
@@ -174,7 +175,7 @@ def main():
     setup_directories()
     build_jars(args.skip_build, logger)
 
-    run_sweep(args, logger)
+    run_sweep(args, logger, timestamp)
 
 if __name__ == "__main__":
     main()

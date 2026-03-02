@@ -112,7 +112,7 @@ def download_and_prepare_dataset(url, filename, logger):
 
 def setup_logging(run_type="benchmark"):
     os.makedirs(LOG_DIR, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") # The unique ID
     log_file = os.path.join(LOG_DIR, f"{run_type}_{timestamp}.log")
 
     logger = logging.getLogger("MoSSo")
@@ -140,4 +140,5 @@ def setup_logging(run_type="benchmark"):
         logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
     sys.excepthook = handle_exception
-    return logger, log_file
+
+    return logger, log_file, timestamp
