@@ -61,9 +61,13 @@ def run_sweep(args, logger, timestamp):
     config = SWEEP_CONFIG[param]
     all_results = []
 
-    datasets_to_run = [("local", args.file)] if args.file else [
-        (url, filename) for data_list in DATASETS.values() for url, filename in data_list
-    ]
+    if args.file:
+        datasets_to_run = [("local", args.file)]
+    else:
+        if args.group == "all":
+            datasets_to_run = [(url, filename) for data_list in DATASETS.values() for url, filename in data_list]
+        else:
+            datasets_to_run = [(url, filename) for url, filename in DATASETS[args.group]]
 
     total_datasets = len(datasets_to_run)
 
@@ -159,6 +163,8 @@ def main():
     parser.add_argument("--escape", type=int, default=SWEEP_CONFIG["escape"]["default"])
     parser.add_argument("--b", type=int, default=SWEEP_CONFIG["b"]["default"])
     parser.add_argument("--interval", type=int, default=1000)
+    parser.add_argument("--group", choices=["all"] + list(DATASETS.keys()), default="all",
+                        help="Which dataset group to run from config.py")
 
     args = parser.parse_args()
 
