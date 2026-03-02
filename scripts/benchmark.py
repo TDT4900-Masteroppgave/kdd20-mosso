@@ -42,8 +42,12 @@ def run_suite(args, file_path, logger, timestamp):
     datasets_to_run = [("local", file_path)] if file_path else []
 
     if not file_path:
-        for cat, data_list in DATASETS.items():
-            for url, filename in data_list:
+        if args.group == "all":
+            for cat, data_list in DATASETS.items():
+                for url, filename in data_list:
+                    datasets_to_run.append((url, filename))
+        else:
+            for url, filename in DATASETS[args.group]:
                 datasets_to_run.append((url, filename))
 
     total_datasets = len(datasets_to_run)
@@ -123,6 +127,8 @@ def main():
     parser.add_argument("--interval", type=int, default=1000)
     parser.add_argument("--runs", type=int, default=1)
     parser.add_argument("--keep-summaries", action="store_true")
+    parser.add_argument("--group", choices=["all"] + list(DATASETS.keys()), default="all",
+                        help="Which dataset group to run from config.py")
 
     args = parser.parse_args()
 
