@@ -19,7 +19,7 @@ def print_summary_table(results, logger):
     header = f"| {'Dataset':<18} | {'Orig Time(s)':<12} | {'Hyb Time(s)':<12} | {'Time Diff':<10} | {'Orig Ratio':<10} | {'Hyb Ratio':<10} | {'Ratio Diff':<10} |"
     sep = "-" * len(header)
 
-    logger.info(f"\n{sep}")
+    logger.info(f"{sep}")
     logger.info(f"| {'FINAL BENCHMARK SUMMARY':^96} |")
     logger.info(f"{sep}")
     logger.info(header)
@@ -35,7 +35,7 @@ def print_summary_table(results, logger):
         if dataset == 'AVERAGE': logger.info(sep)
         logger.info(f"| {dataset:<18} | {t_o:<12} | {t_h:<12} | {t_d:<10} | {r_o:<10} | {r_h:<10} | {r_d:<10} |")
 
-    logger.info(f"{sep}\n")
+    logger.info(f"{sep}")
 
 def run_suite(args, file_path, logger, timestamp):
     results = []
@@ -55,7 +55,7 @@ def run_suite(args, file_path, logger, timestamp):
     # ==========================================
     # STAGE 2: PROCESSING
     # ==========================================
-    logger.info("\n" + "="*60)
+    logger.info("="*60)
     logger.info(f"{'STAGE 2: BENCHMARK PROCESSING':^60}")
     logger.info("="*60)
 
@@ -68,10 +68,10 @@ def run_suite(args, file_path, logger, timestamp):
             path = download_and_prepare_dataset(url, filename, logger)
 
         if not path:
-            logger.warning(f"\n[{i}/{total_datasets}] [!] Skipping {dataset_name} because preparation failed.")
+            logger.warning(f"[{i}/{total_datasets}] [!] Skipping {dataset_name} because preparation failed.")
             continue
 
-        logger.info(f"\n[{i}/{total_datasets}] Benchmarking [{dataset_name}] ({args.runs} runs) ...")
+        logger.info(f"[{i}/{total_datasets}] Benchmarking [{dataset_name}] ({args.runs} runs) ...")
 
         logger.debug("   Running Original...")
         t1_avg, r1_avg, t1_list, r1_list = run_multiple_mosso(
@@ -102,7 +102,7 @@ def run_suite(args, file_path, logger, timestamp):
     # ==========================================
     # STAGE 3: RESULTS
     # ==========================================
-    logger.info("\n" + "="*60)
+    logger.info("="*60)
     logger.info(f"{'STAGE 3: RESULTS & ARTIFACTS':^60}")
     logger.info("="*60)
 
@@ -137,7 +137,7 @@ def main():
     # ==========================================
     # STAGE 1: SETUP
     # ==========================================
-    logger.info("\n" + "="*60)
+    logger.info("="*60)
     logger.info(f"{'STAGE 1: SETUP & COMPILATION':^60}")
     logger.info("="*60)
     logger.info(f"[*] Log initialized: {log_file}")

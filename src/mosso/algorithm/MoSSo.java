@@ -6,6 +6,8 @@ import jdk.jshell.spi.ExecutionControl;
 import mosso.SupernodeHelper;
 import static java.lang.Long.min;
 
+import java.util.Arrays;
+
 public class MoSSo extends SupernodeHelper {
     private final int INF = 0x7FFFFFFF;
     private int iteration = 0;
@@ -13,6 +15,7 @@ public class MoSSo extends SupernodeHelper {
     private int n_hash;
     private int sampleNumber;
     private long start;
+    private int bCandidates;
 
     private IntArrayList[] minHash;
     private IntArrayList[] hf;
@@ -21,7 +24,7 @@ public class MoSSo extends SupernodeHelper {
     private int ecnt = 0;
     private int interval;
 
-    public MoSSo(boolean directed, final int _escape, final int _sample, final int _interval){
+    public MoSSo(boolean directed, final int _escape, final int _sample, final int _interval, int _bCandidates) {
         super(directed);
         if(directed){
             try {
@@ -35,6 +38,7 @@ public class MoSSo extends SupernodeHelper {
         n_hash = 4;
         sampleNumber = _sample;
         interval = _interval;
+        bCandidates = _bCandidates;
         start = System.currentTimeMillis();
         hash_initialization();
     }
@@ -325,28 +329,110 @@ public class MoSSo extends SupernodeHelper {
         }
     }
 
+    private double calculateMH(int u, int v) {
+        int matches = 0;
+        for (int i = 0; i < n_hash; i++) {
+            if (minHash[i].getInt(u) == minHash[i].getInt(v)) {
+                matches++;
+            }
+        }
+        return (double) matches / n_hash;
+    }
+
+    // Compute Δ for moving node v to supernode S (without applying the move)
+    private long evalDelta(final int v, IntArrayList Nv, Int2IntOpenHashMap edgeDeltaV, final int S) {
+        final int R = V.getInt(v);
+        if (R == S) return Long.MAX_VALUE; // no-op move
+        return getDelta(R, S, Nv, edgeDeltaV);
+    }
+
+    private void tryBestSuperNode(int v, int[] bCandidates) {
+        IntArrayList Nv = getNeighbors(v);
+        Int2IntOpenHashMap edgeDeltaV = new Int2IntOpenHashMap();
+        for (int u : Nv) edgeDeltaV.addTo(V.getInt(u), 1);
+
+        long bestDelta = Long.MAX_VALUE;
+        int bestSuperNode = -1;
+
+        for (int candidate : bCandidates) {
+            if(candidate == -1) continue; // skip if candidate is invalid
+
+            int superNodeCandidate = V.getInt(candidate);
+            long delta = evalDelta(v, Nv, edgeDeltaV, superNodeCandidate);
+            if (delta < bestDelta && delta <= 0) { // selects the delta that minimizes the representation cost
+                bestDelta = delta;
+                bestSuperNode = superNodeCandidate;
+            }
+        }
+
+        if (bestSuperNode != -1) {
+            costCounter += bestDelta;
+            doNodalUpdate(v, V.getInt(v), bestSuperNode, Nv);
+        }
+    }
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
-        if(getDegree(dst) > 0) srcnbd.set(0, dst);
-        // coarse clustering using minhash
+        // Add the dst in srcnbd to ensure that dst is always considered as a candidate
+       if(getDegree(dst) > 0) srcnbd.set(0, dst);
+
+        int b = Math.min(bCandidates,srcnbd.size());
+
+
         for (int v : srcnbd) {
             long target = minHash[which].getInt(v);
             if (!srcGrp.containsKey(target)) srcGrp.put(target, new IntArrayList());
             srcGrp.get(target).add(v);
         }
+        
         for (int i = 0; i < sampleNumber; i++) {
-            int nbd = srcnbd.getInt(i);
-            if (randInt(1, getDegree(nbd)) <= 1) {
-                long mh = minHash[which].getInt(nbd);
-                int sz = srcGrp.get(mh).size();
-                // choose random node in the cluster containing nbd
-                int target = srcGrp.get(mh).getInt(randInt(0, sz - 1));
-                if (randInt(1, 10) > escape || iteration < 1000) {
-                    tryNodalUpdate(nbd, V.getInt(target));
+            int y = srcnbd.getInt(i);
+            if (getDegree(y) == 0) continue; // skip if y is an isolated node
+
+            double[] topScores = new double[b];
+            int[] topCandidates = new int[b];
+    
+            Arrays.fill(topScores, -Double.MAX_VALUE);
+            Arrays.fill(topCandidates, -1);
+            
+
+            if (randInt(1, getDegree(y)) <= 1) {
+
+                // find topB candidates by similarity scores for candidates in the same minhash bucket as y
+                for (int candidate : srcGrp.get(minHash[which].getInt(y))) { 
+                    if (candidate == y) continue;
+
+                    double similarity_score = calculateMH(y, candidate);
+
+                    if (similarity_score > topScores[b-1]) {
+                        topScores[b-1] = similarity_score;
+                        topCandidates[b-1] = candidate;
+                    }
+
+                    // Bubble the new score up to keep the array sorted descending
+                    for (int j = b - 1; j > 0; j--) {
+                        if (topScores[j] > topScores[j - 1]) {
+                            // Swap scores
+                            double tempScore = topScores[j];
+                            topScores[j] = topScores[j - 1];
+                            topScores[j - 1] = tempScore;
+                            // Swap nodes
+                            int tempNode = topCandidates[j];
+                            topCandidates[j] = topCandidates[j - 1];
+                            topCandidates[j - 1] = tempNode;
+                        } else {
+                            break; // It's in the right place
+                        }
+                    }
+
+                }
+
+                
+                if ((randInt(1, 10) > escape || iteration < 1000) && topScores[0] > -Double.MAX_VALUE) { // if not corrective escape and there are at least one candidate
+                    tryBestSuperNode(y, topCandidates);
                 } else {
                     // only if the supernode containing nbd is not singleton
-                    if(getSize(V.getInt(nbd)) > 1) tryNodalUpdate(nbd, newSupernode());
+                    if(getSize(V.getInt(y)) > 1) tryNodalUpdate(y, newSupernode());
                 }
             }
         }
