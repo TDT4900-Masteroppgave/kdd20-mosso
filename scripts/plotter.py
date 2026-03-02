@@ -43,23 +43,34 @@ def plot_parameter_analysis(csv_file, param_name, plot_file, logger):
     df = pd.read_csv(csv_file)
     if df.empty: return
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    datasets = df['Dataset'].unique()
-    markers, colors = ['o', 's', '^', 'D', 'v'], ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6']
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-    for i, dataset in enumerate(datasets):
-        subset = df[df['Dataset'] == dataset].sort_values(by=param_name)
-        axes[0].plot(subset[param_name], subset['Ratio_Hybrid'], marker=markers[i % len(markers)], color=colors[i % len(colors)], label=f'{dataset}')
-        axes[0].axhline(y=subset['Ratio_Original'].mean(), linestyle='--', color=colors[i % len(colors)], alpha=0.5)
+    avg_df = df.groupby(param_name).mean(numeric_only=True).reset_index()
 
-        axes[1].plot(subset[param_name], subset['Time_Hybrid'], marker=markers[i % len(markers)], color=colors[i % len(colors)], label=f'{dataset}')
-        axes[1].axhline(y=subset['Time_Original'].mean(), linestyle='--', color=colors[i % len(colors)], alpha=0.5)
+    # --- Plot 1: Average Compression Ratio ---
+    axes[0].plot(avg_df[param_name], avg_df['Ratio_Hybrid'], marker='o', color='#3498db', linewidth=2.5, markersize=8, label='Hybrid MoSSo (Average)')
+    axes[0].axhline(y=avg_df['Ratio_Original'].mean(), linestyle='--', color='#e74c3c', linewidth=2, label='Original MoSSo (Average)')
 
-    axes[0].set_title(f"Compression of {param_name.capitalize()}")
-    axes[1].set_title(f"Execution Time of {param_name.capitalize()}")
-    axes[0].legend(); axes[1].legend()
+    axes[0].set_title(f"Average Compression Ratio vs {param_name.upper()}", fontsize=14, fontweight='bold')
+    axes[0].set_xlabel(f"Parameter: {param_name.upper()}", fontsize=12)
+    axes[0].set_ylabel("Compression Ratio (Lower is Better)", fontsize=12)
+    axes[0].set_xticks(avg_df[param_name])
+    axes[0].tick_params(axis='x', rotation=45)
+    axes[0].grid(True, linestyle=':', alpha=0.7)
+    axes[0].legend(fontsize=11)
+
+    # --- Plot 2: Average Execution Time ---
+    axes[1].plot(avg_df[param_name], avg_df['Time_Hybrid'], marker='s', color='#2ecc71', linewidth=2.5, markersize=8, label='Hybrid MoSSo (Average)')
+    axes[1].axhline(y=avg_df['Time_Original'].mean(), linestyle='--', color='#e74c3c', linewidth=2, label='Original MoSSo (Average)')
+
+    axes[1].set_title(f"Average Execution Time vs {param_name.upper()}", fontsize=14, fontweight='bold')
+    axes[1].set_xlabel(f"Parameter: {param_name.upper()}", fontsize=12)
+    axes[1].set_ylabel("Execution Time in Seconds (Lower is Better)", fontsize=12)
+    axes[1].set_xticks(avg_df[param_name])
+    axes[1].tick_params(axis='x', rotation=45)
+    axes[1].grid(True, linestyle=':', alpha=0.7)
+    axes[1].legend(fontsize=11)
 
     plt.tight_layout()
     plt.savefig(plot_file)
-    logger.debug(f"Saved parameter sweep plot to {plot_file}")
     plt.close()
