@@ -395,9 +395,7 @@ public class MoSSo extends SupernodeHelper {
                 IntArrayList cluster = srcGrp.get(mh);
                 if (cluster == null || cluster.isEmpty()) continue;
                 
-                boolean doEscape = !(randInt(1, 10) > escape || iteration < 1000);
-                
-                if (!doEscape) {
+                if ((randInt(1, 10) > escape || iteration < 1000)) {
                     // with single minHash there are now difference between minHash to nodes in the same cluster 
                     // hence sample b random nodes from the cluster and not top b as mags-dm
                     if (bCandidate > 1) {
