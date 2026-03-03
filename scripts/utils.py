@@ -60,7 +60,7 @@ def build_jars(skip_build, logger):
         except Exception as e:
             logger.error(f"      [!] Unexpected error building {algo_name}: {e}")
 
-    logger.info("[*] All requested Java compilations finished.\n")
+    logger.info("[*] All requested Java compilations finished")
 
 
 def prepare_dataset(filepath, logger):

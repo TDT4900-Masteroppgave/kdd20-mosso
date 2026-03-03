@@ -81,27 +81,35 @@ def run_suite(args, file_path, logger, timestamp):
 
         # The Dynamic Execution Loop
         for algo_name, algo_config in ALGORITHMS.items():
-            jar_file = f"mosso-{algo_name}.jar"
+                jar_file = f"mosso-{algo_name}.jar"
+                if not os.path.exists(jar_file):
+                    logger.warning(f"\t[!] Skipping {algo_name} because {jar_file} is missing.")
+                    continue
 
-            if not os.path.exists(jar_file):
-                logger.warning(f"   [!] Skipping {algo_name} because {jar_file} is missing.")
-                continue
+                template = algo_config.get('template')
 
-            logger.debug(f"\tRunning {algo_name}...")
+                params = algo_config.get('params', {})
+                resolved_params = {
+                    "samples": params.get('samples', args.samples),
+                    "escape": params.get('escape', args.escape),
+                    "b": params.get('b', args.b),
+                    "interval": params.get('interval', args.interval)
+                }
+                logger.debug(f"Running {algo_name} with mapped params: {resolved_params}...")
 
-            if algo_config.get('is_baseline', False):
-                t_avg, r_avg, t_list, r_list = run_multiple_mosso(jar_file, path, f"{algo_name}_{dataset_name}_{timestamp}", 120, 3, args.interval, args.runs, not args.keep_summaries, logger)
-            else:
-                t_avg, r_avg, t_list, r_list = run_multiple_mosso(jar_file, path, f"{algo_name}_{dataset_name}_{timestamp}", args.samples, args.escape, args.interval, args.runs, not args.keep_summaries, logger, args.b)
+                t_avg, r_avg, t_list, r_list = run_multiple_mosso(
+                    jar_file, path, f"{algo_name}_{dataset_name}_{timestamp}",
+                    args.runs, not args.keep_summaries, logger, resolved_params, template
+                )
 
-            if t_avg is not None:
-                current_result[f"Time_{algo_name}"] = t_avg
-                current_result[f"Ratio_{algo_name}"] = r_avg
-                logger.info(f"\t=> {algo_name: <12} Time: {t_avg:.3f}s | Ratio: {r_avg:.5f}")
+                if t_avg is not None:
+                    current_result[f"Time_{algo_name}"] = t_avg
+                    current_result[f"Ratio_{algo_name}"] = r_avg
+                    logger.info(f"\t=> {algo_name: <12} Time: {t_avg:.3f}s | Ratio: {r_avg:.5f}")
 
-                if args.runs > 1:
-                    all_times_dict[algo_name] = t_list
-                    all_ratios_dict[algo_name] = r_list
+                    if args.runs > 1:
+                        all_times_dict[algo_name] = t_list
+                        all_ratios_dict[algo_name] = r_list
 
         results.append(current_result)
 

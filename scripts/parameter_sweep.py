@@ -96,7 +96,7 @@ def run_sweep(args, logger, timestamp):
         logger.info(f"--- Testing {param.upper()} = {val} ---")
         samples = val if param == "samples" else args.samples
         escape = val if param == "escape" else args.escape
-        b_cand = val if param == "b" else args.b
+        b = val if param == "b" else args.b
 
         for i, (url, filename) in enumerate(datasets_to_run, 1):
             dataset_name = filename.replace(".txt", "").replace(".csv", "")
@@ -110,13 +110,23 @@ def run_sweep(args, logger, timestamp):
             # The Dynamic Sweep Loop
             for algo_name, algo_config in ALGORITHMS.items():
                 jar_file = f"mosso-{algo_name}.jar"
-                if not os.path.exists(jar_file): continue
-                logger.debug(f"Running {algo_name}...")
+                if not os.path.exists(jar_file):
+                    logger.warning(f"\t[!] Skipping {algo_name} because {jar_file} is missing.")
+                    continue
 
-                if algo_config.get('is_baseline', False):
-                    t, r, _, _ = run_multiple_mosso(jar_file, path, f"{algo_name}_{dataset_name}_{param}{val}_{timestamp}", 120, 3, args.interval, args.runs, True, logger)
-                else:
-                    t, r, _, _ = run_multiple_mosso(jar_file, path, f"{algo_name}_{dataset_name}_{param}{val}_{timestamp}", samples, escape, args.interval, args.runs, True, logger, b_cand)
+                template = algo_config.get('template', [])
+                params = algo_config.get('params', {})
+                resolved_params = {
+                    "samples": params.get('samples', samples),
+                    "escape": params.get('escape', escape),
+                    "b": params.get('b', b),
+                    "interval": params.get('interval', args.interval)
+                }
+                logger.debug(f"Running {algo_name} with mapped params: {resolved_params}...")
+
+                t, r, _, _ = run_multiple_mosso(
+                    jar_file, path, f"{algo_name}_{dataset_name}_{param}{val}_{timestamp}",
+                    args.runs, True, logger, resolved_params, template)
 
                 if t is not None:
                     current_result[f"Time_{algo_name}"] = t

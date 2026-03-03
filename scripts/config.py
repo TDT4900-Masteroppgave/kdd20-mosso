@@ -19,22 +19,23 @@ ALGORITHMS = {
     "Baseline": {
         "repo": "https://github.com/jihoonko/kdd20-mosso.git",
         "branch": "master",
-        "is_baseline": True
+        "params" : {"samples": 120, "escape": 3},
+        "template": ["escape", "samples", "interval"]
     },
     "Strat_1": {
-        "repo": "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git",
+        "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1",
-        "is_baseline": False
+        "template": ["escape", "samples", "interval", "b"]
     },
     "Strat_2": {
-        "repo": "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git",
+        "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_2",
-        "is_baseline": False
+        "template": ["escape", "samples", "interval", "b"]
     },
     "Strat_1_2": {
-        "repo": "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git",
+        "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1_2",
-        "is_baseline": False
+        "template": ["escape", "samples", "interval", "b"]
     }
 }
 

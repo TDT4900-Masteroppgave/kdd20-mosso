@@ -72,7 +72,7 @@ def plot_parameter_analysis(csv_file, param_name, plot_file, logger):
     for idx, strat in enumerate(strategies):
         marker = markers[idx % len(markers)]
         color = colors[idx]
-        is_baseline = (strat == "Original")
+        is_baseline = (strat == "Baseline")
 
         # Style baseline as a dashed line to stand out
         line_style = '--' if is_baseline else '-'
