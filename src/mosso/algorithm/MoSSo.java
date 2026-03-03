@@ -379,13 +379,13 @@ public class MoSSo extends SupernodeHelper {
         int b = Math.min(bCandidates,srcnbd.size());
 
 
-        for (int v : srcnbd) {
-            long target = minHash[which].getInt(v);
-            if (!srcGrp.containsKey(target)) srcGrp.put(target, new IntArrayList());
-            srcGrp.get(target).add(v);
-        }
+        // for (int v : srcnbd) {
+        //     long target = minHash[which].getInt(v);
+        //     if (!srcGrp.containsKey(target)) srcGrp.put(target, new IntArrayList());
+        //     srcGrp.get(target).add(v);
+        // }
         
-        for (int i = 0; i < sampleNumber; i++) {
+        for (int i = 0; i < srcnbd.size(); i++) { // the size of the new candidate pool is greater than sampleNumber 
             int y = srcnbd.getInt(i);
             if (getDegree(y) == 0) continue; // skip if y is an isolated node
 
@@ -399,7 +399,7 @@ public class MoSSo extends SupernodeHelper {
             if (randInt(1, getDegree(y)) <= 1) {
 
                 // find topB candidates by similarity scores for candidates in the same minhash bucket as y
-                for (int candidate : srcGrp.get(minHash[which].getInt(y))) { 
+                for (int candidate : srcnbd) { 
                     if (candidate == y) continue;
 
                     double similarity_score = calculateMH(y, candidate);
@@ -495,15 +495,15 @@ public class MoSSo extends SupernodeHelper {
         updateHash(src, dst, add);
         int which = randInt(0, n_hash-1);
         if(getDegree(src) > 0){
-            IntArrayList srcnbd = getRandomNeighbors(src, sampleNumber);
-            _processEdge(dst, srcnbd, which);
+            // IntArrayList srcnbd = getRandomNeighbors(src, sampleNumber);
+            _processEdge(dst, getNeighbors(dst), which);
         }else{
             // since node src is an isolated node
             deactivateNode(src);
         }
         if(getDegree(dst) > 0){
-            IntArrayList dstnbd = getRandomNeighbors(dst, sampleNumber);
-            _processEdge(src, dstnbd, which);
+            // IntArrayList dstnbd = getRandomNeighbors(dst, sampleNumber);
+            _processEdge(src, getNeighbors(src), which);
         }else{
             // since node dst is an isolated node
             deactivateNode(dst);
