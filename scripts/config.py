@@ -28,7 +28,7 @@ ALGORITHMS = {
     "strat_1": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1",
-        "template": ["escape", "samples", "interval", "b"]
+        "template": ["escape", "samples", "interval"]
     },
     "strat_2": {
         "repo": BASE_REPO_URL,
