@@ -140,13 +140,27 @@ def main():
     parser.add_argument("--runs", type=int, default=1)
     parser.add_argument("--keep-summaries", action="store_true")
     parser.add_argument("--group", choices=["all"] + list(DATASETS.keys()), default="all")
-    parser.add_argument("--local", action="store_true", help="Compile and test local code")
+    parser.add_argument("--algos", nargs='+', help="Specific algorithms to run (e.g. Local Baseline Strat_1)")
 
     args = parser.parse_args()
     logger, log_file, timestamp = setup_logging("benchmark")
 
-    if not args.local:
-        ALGORITHMS.pop("Local", None)
+    args.local = False
+
+    if args.algos:
+        if "local" in args.algos:
+            args.local = True
+
+        for a in args.algos:
+            if a not in ALGORITHMS.keys():
+                logger.error(f"[!] Unknown algorithm: {a}. Available options: {list(ALGORITHMS.keys())}")
+                exit(1)
+
+        for key in list(ALGORITHMS.keys()):
+            if key not in args.algos:
+                ALGORITHMS.pop(key, None)
+    else:
+        ALGORITHMS.pop("local", None)
 
     logger.info("="*60)
     logger.info(f"{'STAGE 1: SETUP & COMPILATION':^60}")

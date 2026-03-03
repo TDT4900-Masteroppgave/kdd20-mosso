@@ -16,26 +16,26 @@ ORIGINAL_REPO_URL = "https://github.com/jihoonko/kdd20-mosso"
 BASE_REPO_URL = "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git"
 
 ALGORITHMS = {
-    "Local": {
+    "local": {
         "template": ["escape", "samples", "interval", "b"]
     },
-    "Baseline": {
+    "baseline": {
         "repo": "https://github.com/jihoonko/kdd20-mosso.git",
         "branch": "master",
         "params" : {"samples": 120, "escape": 3},
         "template": ["escape", "samples", "interval"]
     },
-    "Strat_1": {
+    "strat_1": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1",
         "template": ["escape", "samples", "interval", "b"]
     },
-    "Strat_2": {
+    "strat_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_2",
         "template": ["escape", "samples", "interval", "b"]
     },
-    "Strat_1_2": {
+    "strat_1_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1_2",
         "template": ["escape", "samples", "interval", "b"]

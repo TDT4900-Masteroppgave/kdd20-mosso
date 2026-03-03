@@ -46,7 +46,7 @@ def build_jars(skip_build, is_local, logger):
     logger.info("[*] Compiling all configured algorithms...")
 
     for algo_name, config in ALGORITHMS.items():
-        if algo_name == "Local":
+        if algo_name == "local":
             continue
 
         repo_url = config['repo']
