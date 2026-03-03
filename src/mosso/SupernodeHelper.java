@@ -9,6 +9,8 @@ import mosso.util.*;
 
 import static java.lang.Double.min;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 public class SupernodeHelper extends SummaryGraphModule {
     protected ObjectArrayList<IntHashSet> invV = new ObjectArrayList<>();
     private IntArrayList deg = new IntArrayList();
@@ -71,6 +73,74 @@ public class SupernodeHelper extends SummaryGraphModule {
             Nv.add(nbr);
         }
         return Nv;
+    }
+
+    
+    protected IntArrayList sampleWithoutReplacementInPlace(IntArrayList list, int c) {
+        int n = list.size();
+        if (c < 0 || c > n) throw new IllegalArgumentException("c must be in [0, size]");
+        IntArrayList out = new IntArrayList(c);
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+
+        for (int k = 0; k < c; k++) {
+            int last = list.size() - 1;
+            int j = rnd.nextInt(list.size());     // 0..last
+            int v = list.getInt(j);
+
+            // swap j with last (manual swap)
+            list.set(j, list.getInt(last));
+            list.set(last, v);
+
+            // pop last
+            out.add(list.removeInt(last));
+        }
+        return out;
+    }
+
+
+     protected IntArrayList getNeighborsWithoutReplacement(int v, int sampleNumber){
+        // Based on algorithms in SWeG
+        IntOpenHashSet nbrs = new IntOpenHashSet();
+        int Sv = V.getInt(v);
+        for(int nbr: P.getNeighbors(Sv)){
+            nbrs.addAll(invV.get(nbr));
+        }
+        for(int nbr: Cm.getNeighbors(v)){
+            nbrs.remove(nbr);
+        }
+        nbrs.remove(v);
+        IntArrayList Nv = new IntArrayList(nbrs);
+        for(int nbr: Cp.getNeighbors(v)){
+            Nv.add(nbr);
+        }
+
+        return sampleWithoutReplacementInPlace(Nv, sampleNumber);
+    }
+
+     protected IntArrayList getNeighborsWithReplacement(int v, int sampleNumber){
+        // Based on algorithms in SWeG
+        IntOpenHashSet nbrs = new IntOpenHashSet();
+        int Sv = V.getInt(v);
+        for(int nbr: P.getNeighbors(Sv)){
+            nbrs.addAll(invV.get(nbr));
+        }
+        for(int nbr: Cm.getNeighbors(v)){
+            nbrs.remove(nbr);
+        }
+        nbrs.remove(v);
+        IntArrayList Nv = new IntArrayList(nbrs);
+        for(int nbr: Cp.getNeighbors(v)){
+            Nv.add(nbr);
+        }
+
+        IntArrayList ranNv = new IntArrayList(sampleNumber);
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+
+        for (int i = 0; i < sampleNumber; i++) {
+            ranNv.add(Nv.getInt(rnd.nextInt(Nv.size())));
+        }
+
+        return ranNv;
     }
 
     protected int getNeighborCost(int v){
