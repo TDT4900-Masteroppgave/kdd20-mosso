@@ -1,4 +1,3 @@
-import os
 import shutil
 import subprocess
 import urllib.request
@@ -10,13 +9,16 @@ import sys
 from datetime import datetime
 from config import LOG_DIR
 
+
 def get_fastutil_path():
     fastutil_files = glob.glob("fastutil-*.jar")
     return fastutil_files[0] if fastutil_files else "fastutil-missing.jar"
 
+
 def setup_directories():
-    for d in [DATASETS_DIR, OUTPUT_DIR, BENCHMARK_DIR, EXTERNAL_DIR, RUNS_DIR, SUMMARIZED_DIR, SWEEP_DIR, LOG_DIR]:
+    for d in [DATASETS_DIR, OUTPUT_DIR, BENCHMARK_DIR, RUNS_DIR, SUMMARIZED_DIR, SWEEP_DIR, LOG_DIR, VERSIONS_DIR]:
         os.makedirs(d, exist_ok=True)
+
 
 def build_jars(skip_build, logger):
     if skip_build:
@@ -27,19 +29,39 @@ def build_jars(skip_build, logger):
         logger.error(f"[!] Error: {fastutil} missing. Download it to root first.")
         exit(1)
 
-    logger.debug("Compiling Original MoSSo...")
-    if not os.path.exists(BASELINE_DIR):
-        subprocess.run(["git", "clone", "-q", ORIGINAL_REPO_URL, BASELINE_DIR], check=True)
+    logger.info("[*] Compiling all configured algorithms...")
 
-    shutil.copy(fastutil, os.path.join(BASELINE_DIR, fastutil))
+    for algo_name, config in ALGORITHMS.items():
+        repo_url = config['repo']
+        branch = config['branch']
+        jar_name = f"mosso-{algo_name}.jar"
+        target_dir = os.path.join(VERSIONS_DIR, algo_name)
 
-    subprocess.run(["bash", "compile.sh"], cwd=BASELINE_DIR, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    shutil.move(os.path.join(BASELINE_DIR, "mosso-1.0.jar"), JAR_ORIGINAL)
+        logger.debug(f"   -> Building {algo_name} (Repo: {repo_url.split('/')[-1]} | Branch: {branch})...")
 
-    logger.debug("Compiling Hybrid MoSSo...")
-    subprocess.run(["bash", "compile.sh"], check=True, stdout=subprocess.DEVNULL)
-    shutil.move("mosso-1.0.jar", JAR_HYBRID)
-    logger.info("[*] Java compilation successful.")
+        try:
+            if not os.path.exists(target_dir):
+                subprocess.run(
+                    ["git", "clone", "-q", "--branch", branch, "--single-branch", repo_url, target_dir],
+                    check=True, stderr=subprocess.PIPE, text=True
+                )
+            else:
+                subprocess.run(["git", "pull", "-q"], cwd=target_dir, check=True, stderr=subprocess.PIPE)
+
+            shutil.copy(fastutil, os.path.join(target_dir, fastutil))
+            subprocess.run(["bash", "compile.sh"], cwd=target_dir, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+            shutil.move(os.path.join(target_dir, "mosso-1.0.jar"), jar_name)
+            logger.info(f"      [OK] Successfully built {jar_name}")
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"      [!] Failed to build {algo_name}. Git/Compile Error: {e.stderr.strip()}")
+            if os.path.exists(target_dir):
+                shutil.rmtree(target_dir) # Clean up broken clones
+        except Exception as e:
+            logger.error(f"      [!] Unexpected error building {algo_name}: {e}")
+
+    logger.info("[*] All requested Java compilations finished.\n")
+
 
 def prepare_dataset(filepath, logger):
     filename = os.path.basename(filepath)
@@ -72,6 +94,7 @@ def prepare_dataset(filepath, logger):
         if os.path.exists(prepared_path):
             os.remove(prepared_path)
         return None
+
 
 def download_and_prepare_dataset(url, filename, logger):
     gz_path = os.path.join(DATASETS_DIR, filename + ".gz")
@@ -110,9 +133,10 @@ def download_and_prepare_dataset(url, filename, logger):
 
     return txt_path
 
+
 def setup_logging(run_type="benchmark"):
     os.makedirs(LOG_DIR, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") # The unique ID
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # The unique ID
     log_file = os.path.join(LOG_DIR, f"{run_type}_{timestamp}.log")
 
     logger = logging.getLogger("MoSSo")
