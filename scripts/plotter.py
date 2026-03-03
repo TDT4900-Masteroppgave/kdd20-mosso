@@ -33,7 +33,7 @@ def plot_results(csv_file, plot_file, logger):
     logger.debug(f"Saved bar plot to {plot_file}")
     plt.close()
 
-def plot_runs_variance(dataset_name, all_times_dict, all_ratios_dict, runs_dir, logger):
+def plot_runs_variance(dataset_name, all_times_dict, all_ratios_dict, runs_dir):
     # Updated to handle dictionaries of lists (one list per strategy)
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     cmap = plt.get_cmap('tab10')
@@ -57,7 +57,7 @@ def plot_runs_variance(dataset_name, all_times_dict, all_ratios_dict, runs_dir, 
     plt.savefig(os.path.join(runs_dir, f"{dataset_name}_variance_plot.pdf"))
     plt.close()
 
-def plot_parameter_analysis(csv_file, param_name, plot_file, logger):
+def plot_parameter_analysis(csv_file, param_name, plot_file):
     df = pd.read_csv(csv_file)
     if df.empty: return
 
@@ -72,7 +72,7 @@ def plot_parameter_analysis(csv_file, param_name, plot_file, logger):
     for idx, strat in enumerate(strategies):
         marker = markers[idx % len(markers)]
         color = colors[idx]
-        is_baseline = (strat == "Baseline")
+        is_baseline = (strat == "baseline")
 
         # Style baseline as a dashed line to stand out
         line_style = '--' if is_baseline else '-'

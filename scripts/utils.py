@@ -1,8 +1,12 @@
+import os
 import shutil
 import subprocess
 import urllib.request
 import gzip
 import glob
+import argparse
+import pandas as pd
+from tabulate import tabulate
 
 from config import *
 import logging
@@ -122,7 +126,7 @@ def download_and_prepare_dataset(url, filename, logger):
     if not os.path.exists(txt_path):
         try:
             if not os.path.exists(gz_path):
-                logger.info(f"[*] Downloading {filename}...")
+                logger.info(f"[*] Downloading {filename}")
                 urllib.request.urlretrieve(url, gz_path)
 
             logger.debug(f"Extracting and cleaning {filename}...")
@@ -153,7 +157,7 @@ def download_and_prepare_dataset(url, filename, logger):
     return txt_path
 
 
-def setup_logging(run_type="benchmark"):
+def setup_logging(run_type):
     os.makedirs(LOG_DIR, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # The unique ID
     log_file = os.path.join(LOG_DIR, f"{run_type}_{timestamp}.log")
@@ -177,11 +181,123 @@ def setup_logging(run_type="benchmark"):
 
     def handle_exception(exc_type, exc_value, exc_traceback):
         if issubclass(exc_type, KeyboardInterrupt):
-            logger.warning("\n[!] Execution interrupted by user (KeyboardInterrupt).")
+            logger.warning("[!] Execution interrupted by user (KeyboardInterrupt).")
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
         logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
     sys.excepthook = handle_exception
 
-    return logger, log_file, timestamp
+    return logger, timestamp
+
+def parse_and_filter_args(script_type="benchmark"):
+    """CLI parsing and ALGORITHM dictionary filtering."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--file", type=str, help="Specific local graph file.")
+    parser.add_argument("--skip-build", action="store_true")
+    parser.add_argument("--samples", type=int, default=120)
+    parser.add_argument("--escape", type=int, default=3)
+    parser.add_argument("--b", type=int, default=5)
+    parser.add_argument("--interval", type=int, default=1000)
+    parser.add_argument("--runs", type=int, default=1)
+    parser.add_argument("--group", choices=["all"] + list(DATASETS.keys()), default="all")
+    parser.add_argument("--algos", nargs='+', help="Specific algorithms to run (e.g. local baseline strat_1)")
+    parser.add_argument("--keep-summaries", action="store_true")
+
+    if script_type == "sweep":
+        parser.add_argument("--param", choices=list(SWEEP_CONFIG.keys()), required=True)
+        parser.add_argument("--range", type=int, nargs=3)
+        parser.add_argument("--values", type=int, nargs='+')
+
+    args = parser.parse_args()
+    args.local = False
+
+    # Filter ALGORITHMS
+    if args.algos:
+        if "local" in args.algos:
+            args.local = True
+        for a in args.algos:
+            if a not in ALGORITHMS.keys():
+                print(f"[!] Unknown algorithm: {a}. Available options: {list(ALGORITHMS.keys())}")
+                exit(1)
+        for key in list(ALGORITHMS.keys()):
+            if key not in args.algos:
+                ALGORITHMS.pop(key, None)
+    else:
+        ALGORITHMS.pop("local", None)
+
+    return args
+
+def get_datasets_to_run(args):
+    """Deciding which datasets to process."""
+    datasets_to_run = [("local", args.file)] if args.file else []
+    if not args.file:
+        if args.group == "all":
+            for cat, data_list in DATASETS.items():
+                for url, filename in data_list:
+                    datasets_to_run.append((url, filename))
+        else:
+            for url, filename in DATASETS[args.group]:
+                datasets_to_run.append((url, filename))
+    return datasets_to_run
+
+def print_sweep_table(results, logger, title="BENCHMARK SUMMARY", sweep_param=None):
+    df = pd.DataFrame(results)
+
+    display_df = df.copy()
+    new_cols = {}
+    for col in display_df.columns:
+        if col.startswith("Time_"):
+            new_cols[col] = f"{col.replace('Time_', '').capitalize()} Time"
+        elif col.startswith("Ratio_"):
+            new_cols[col] = f"{col.replace('Ratio_', '').capitalize()} Ratio"
+        else:
+            new_cols[col] = col.capitalize()
+    display_df.rename(columns=new_cols, inplace=True)
+
+    table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False, floatfmt=".4f")
+    line_width = len(table_str.split('\n')[0])
+
+    logger.info("=" * line_width)
+    logger.info(f"{title:^{line_width}}")
+    logger.info("=" * line_width)
+    logger.info(table_str)
+
+    # Generate Averages Grouped by the Parameter
+    logger.info("=" * line_width)
+    logger.info(f"{'AVERAGES BY PARAMETER VALUE':^{line_width}}")
+    logger.info("=" * line_width)
+
+    pretty_param = sweep_param.capitalize()
+    avg_df = display_df.groupby(pretty_param).mean(numeric_only=True).reset_index()
+    avg_df.insert(0, 'Dataset', 'ALL (Avg)')
+
+    avg_table_str = tabulate(avg_df, headers='keys', tablefmt='grid', showindex=False, floatfmt=".4f")
+    logger.info(avg_table_str)
+
+def print_benchmark_table(results, logger, title="BENCHMARK SUMMARY"):
+    df = pd.DataFrame(results)
+
+    display_df = df.copy()
+    new_cols = {}
+    for col in display_df.columns:
+        if col.startswith("Time_"):
+            new_cols[col] = f"{col.replace('Time_', '').capitalize()} Time"
+        elif col.startswith("Ratio_"):
+            new_cols[col] = f"{col.replace('Ratio_', '').capitalize()} Ratio"
+        else:
+            new_cols[col] = col.capitalize()
+    display_df.rename(columns=new_cols, inplace=True)
+
+    if "Dataset" in display_df.columns and len(display_df.columns) > 2 and "Dataset" == display_df.columns[0]:
+        avg_row = display_df.mean(numeric_only=True).to_dict()
+        avg_row['Dataset'] = 'AVERAGE'
+        display_df = pd.concat([display_df, pd.DataFrame([avg_row])], ignore_index=True)
+
+    table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False, floatfmt=".4f")
+    line_width = len(table_str.split('\n')[0])
+
+    logger.info("=" * line_width)
+    logger.info(f"{title:^{line_width}}")
+    logger.info("=" * line_width)
+    logger.info(table_str)
