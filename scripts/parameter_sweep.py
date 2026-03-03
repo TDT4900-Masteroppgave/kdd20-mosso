@@ -1,190 +1,78 @@
-import argparse
+import os
 import pandas as pd
-from config import *
-from utils import setup_logging, setup_directories, build_jars, download_and_prepare_dataset, prepare_dataset
+from config import ALGORITHMS, SWEEP_DIR, SWEEP_CONFIG
+from utils import setup_logging, setup_directories, build_jars, download_and_prepare_dataset, prepare_dataset, \
+    parse_and_filter_args, get_datasets_to_run, print_sweep_table
 from run_mosso import run_multiple_mosso
 from plotter import plot_parameter_analysis
 
-def print_sweep_summary_table(results, param_name, logger):
-    if not results: return
-    df = pd.DataFrame(results)
 
-    df['Time_Diff_%'] = ((df['Time_Original'] - df['Time_Hybrid']) / df['Time_Original']) * 100
-    df['Ratio_Diff_%'] = ((df['Ratio_Hybrid'] - df['Ratio_Original']) / df['Ratio_Original']) * 100
-
-    header = f"| {'Dataset':<18} | {param_name.upper():<9} | {'Orig Time(s)':<12} | {'Hyb Time(s)':<12} | {'Time Diff':<10} | {'Orig Ratio':<10} | {'Hyb Ratio':<10} | {'Ratio Diff':<10} |"
-    sep = "-" * len(header)
-
-    logger.info(f"{sep}")
-    logger.info(f"| {f'FINAL SWEEP SUMMARY: {param_name.upper()}':^{len(header)-4}} |")
-    logger.info(f"{sep}")
-    logger.info(header)
-    logger.info(sep)
-
-    df_sorted = df.sort_values(by=['Dataset', param_name])
-
-    current_dataset = None
-    for _, row in df_sorted.iterrows():
-        dataset = row['Dataset'][:18]
-        if current_dataset and dataset != current_dataset:
-            logger.info(sep)
-        current_dataset = dataset
-
-        p_val = str(row[param_name])
-        t_o, t_h = f"{row['Time_Original']:.3f}", f"{row['Time_Hybrid']:.3f}"
-        t_d = f"{row['Time_Diff_%']:+.2f}%"
-        r_o, r_h = f"{row['Ratio_Original']:.5f}", f"{row['Ratio_Hybrid']:.5f}"
-        r_d = f"{row['Ratio_Diff_%']:+.4f}%"
-
-        logger.info(f"| {dataset:<18} | {p_val:<9} | {t_o:<12} | {t_h:<12} | {t_d:<10} | {r_o:<10} | {r_h:<10} | {r_d:<10} |")
-
-    logger.info(sep)
-    logger.info(f"| {'AVERAGES BY PARAMETER VALUE':^{len(header)-4}} |")
-    logger.info(sep)
-
-    avg_df = df.groupby(param_name).mean(numeric_only=True).reset_index()
-    for _, row in avg_df.iterrows():
-        p_val_num = row[param_name]
-        p_val = str(int(p_val_num)) if p_val_num.is_integer() else f"{p_val_num:.2f}"
-
-        t_o, t_h = f"{row['Time_Original']:.3f}", f"{row['Time_Hybrid']:.3f}"
-        t_d = f"{row['Time_Diff_%']:+.2f}%"
-        r_o, r_h = f"{row['Ratio_Original']:.5f}", f"{row['Ratio_Hybrid']:.5f}"
-        r_d = f"{row['Ratio_Diff_%']:+.4f}%"
-
-        logger.info(f"| {'ALL (Avg)':<18} | {p_val:<9} | {t_o:<12} | {t_h:<12} | {t_d:<10} | {r_o:<10} | {r_h:<10} | {r_d:<10} |")
-
-    logger.info(f"{sep}")
-
-def run_sweep(args, logger, timestamp):
-    param = args.param
-    config = SWEEP_CONFIG[param]
-    all_results = []
-
-    if args.file:
-        datasets_to_run = [("local", args.file)]
-    else:
-        if args.group == "all":
-            datasets_to_run = [(url, filename) for data_list in DATASETS.values() for url, filename in data_list]
-        else:
-            datasets_to_run = [(url, filename) for url, filename in DATASETS[args.group]]
-
-    total_datasets = len(datasets_to_run)
-
-    if args.range:
-        start, stop, step = args.range
-        sweep_values = list(range(start, stop + 1, step))
-    elif args.values:
-        sweep_values = args.values
-    else:
-        sweep_values = config["values"]
-
-    # ==========================================
-    # STAGE 2: PROCESSING
-    # ==========================================
-    logger.info("="*60)
-    logger.info(f"{'STAGE 2: PARAMETER SWEEP PROCESSING':^60}")
-    logger.info("="*60)
-    logger.info(f"[*] Starting Sweep for: {param.upper()} over {len(sweep_values)} values.")
+def run_sweep(args, datasets_to_run, sweep_values, param, logger, timestamp):
+    results = []
 
     for val in sweep_values:
         logger.info(f"--- Testing {param.upper()} = {val} ---")
-
         samples = val if param == "samples" else args.samples
         escape = val if param == "escape" else args.escape
-        b_cand = val if param == "b" else args.b
+        b = val if param == "b" else args.b
 
         for i, (url, filename) in enumerate(datasets_to_run, 1):
-            # ... (Keep your existing dataset running logic exactly as it is) ...
             dataset_name = filename.replace(".txt", "").replace(".csv", "")
+            path = prepare_dataset(filename, logger) if url == "local" else download_and_prepare_dataset(url, filename,
+                                                                                                         logger)
+            if not path: continue
 
-            if url == "local":
-                path = prepare_dataset(filename, logger)
-            else:
-                path = download_and_prepare_dataset(url, filename, logger)
+            logger.info(f"[{i}/{len(datasets_to_run)}] Running {dataset_name} ({args.runs} runs) ...")
+            current_result = {"Dataset": dataset_name, param: val}
 
-            if not path:
-                logger.warning(f"[{i}/{total_datasets}] [!] Skipping {dataset_name} because preparation failed.")
-                continue
+            for algo_name, algo_config in ALGORITHMS.items():
+                jar_file = f"mosso-{algo_name}.jar"
+                if not os.path.exists(jar_file): continue
 
-            logger.info(f"[{i}/{total_datasets}] Running {dataset_name} ({args.runs} runs) ...")
+                template = algo_config.get('template', [])
+                params = algo_config.get('params', {})
+                resolved_params = {
+                    "samples": params.get('samples', samples),
+                    "escape": params.get('escape', escape),
+                    "b": params.get('b', b),
+                    "interval": params.get('interval', args.interval)
+                }
 
-            logger.debug("   Running Original...")
-            t1, r1, _, _ = run_multiple_mosso(JAR_ORIGINAL, path, f"orig_{dataset_name}_{param}{val}_{timestamp}", 120, 3, args.interval, args.runs, True, logger)
+                t, r, _, _ = run_multiple_mosso(
+                    jar_file, path, f"{algo_name}_{dataset_name}_{param}{val}_{timestamp}",
+                    args.runs, True, logger, resolved_params, template)
 
-            logger.debug("   Running Hybrid...")
-            t2, r2, _, _ = run_multiple_mosso(JAR_HYBRID, path, f"hyb_{dataset_name}_{param}{val}_{timestamp}", samples, escape, args.interval, args.runs, True, logger, b_cand)
+                if t is not None:
+                    current_result[f"Time_{algo_name}"], current_result[f"Ratio_{algo_name}"] = t, r
+                    logger.info(f"\t=> {algo_name: <12} Time: {t:.3f}s | Ratio: {r:.5f}")
 
-            if None in (t1, t2):
-                logger.warning(f"   [!] Skipped {dataset_name} due to execution failure.")
-                continue
+            results.append(current_result)
 
-            t_diff = ((t1 - t2) / t1) * 100
-            r_diff = ((r2 - r1) / r1) * 100
-            logger.info(f"   => Original: {t1:.3f}s / {r1:.5f} | Hybrid: {t2:.3f}s / {r2:.5f}")
-            logger.info(f"   => Diff: Time {t_diff:+.2f}% | Ratio {r_diff:+.4f}%")
-
-            all_results.append({
-                "Dataset": dataset_name, param: val,
-                "Time_Original": t1, "Time_Hybrid": t2,
-                "Ratio_Original": r1, "Ratio_Hybrid": r2
-            })
-
-        # --- NEW: INCREMENTAL SAVING ---
-        # After testing all datasets for this specific 'val', update the files immediately!
-        if all_results:
-            current_df = pd.DataFrame(all_results)
+        if results:
             master_csv = os.path.join(SWEEP_DIR, f"sweep_{param}_results_{timestamp}.csv")
-            current_df.to_csv(master_csv, index=False)
+            pd.DataFrame(results).to_csv(master_csv, index=False)
+            plot_parameter_analysis(master_csv, param, os.path.join(SWEEP_DIR, f"sweep_{param}_plot_{timestamp}.pdf"))
 
-            plot_output = os.path.join(SWEEP_DIR, f"sweep_{param}_plot_{timestamp}.pdf")
-            plot_parameter_analysis(master_csv, param, plot_output, logger)
+    return results
 
-    # ==========================================
-    # STAGE 3: RESULTS
-    # ==========================================
-    logger.info("="*60)
-    logger.info(f"{'STAGE 3: RESULTS & ARTIFACTS':^60}")
-    logger.info("="*60)
-
-    if all_results:
-        print_sweep_summary_table(all_results, param, logger)
-        logger.info(f"[*] Sweep complete! Artifacts saved incrementally to: {SWEEP_DIR}")
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--param", choices=list(SWEEP_CONFIG.keys()), required=True)
-    parser.add_argument("--file", type=str)
-    parser.add_argument("--runs", type=int, default=1)
-    parser.add_argument("--skip-build", action="store_true")
+    args = parse_and_filter_args(script_type="sweep")
+    logger, timestamp = setup_logging(f"sweep_{args.param}")
 
-    parser.add_argument("--range", type=int, nargs=3, metavar=('START', 'STOP', 'STEP'),
-                        help="Generate a range of values to test (e.g., --range 10 100 10)")
-    parser.add_argument("--values", type=int, nargs='+', help="Specific values to test (e.g., --values 10 50 100)")
-
-    parser.add_argument("--samples", type=int, default=SWEEP_CONFIG["samples"]["default"])
-    parser.add_argument("--escape", type=int, default=SWEEP_CONFIG["escape"]["default"])
-    parser.add_argument("--b", type=int, default=SWEEP_CONFIG["b"]["default"])
-    parser.add_argument("--interval", type=int, default=1000)
-    parser.add_argument("--group", choices=["all"] + list(DATASETS.keys()), default="all",
-                        help="Which dataset group to run from config.py")
-
-    args = parser.parse_args()
-
-    logger, log_file, timestamp = setup_logging(f"sweep_{args.param}")
-
-    # ==========================================
-    # STAGE 1: SETUP
-    # ==========================================
-    logger.info("="*60)
-    logger.info(f"{'STAGE 1: SETUP & COMPILATION':^60}")
-    logger.info("="*60)
-    logger.info(f"[*] Log initialized: {log_file}")
-
+    logger.info("=" * 10 + f"{' STAGE 1: SETUP & COMPILATION ':^10}" + "=" * 10)
     setup_directories()
-    build_jars(args.skip_build, logger)
+    build_jars(args.skip_build, args.local, logger)
 
-    run_sweep(args, logger, timestamp)
+    logger.info("=" * 10 + f"{' STAGE 2: SWEEP PROCESSING ':^10}" + "=" * 10)
+    datasets_to_run = get_datasets_to_run(args)
+    param, config = args.param, SWEEP_CONFIG[args.param]
+    sweep_values = list(range(*args.range)) if args.range else (args.values if args.values else config["values"])
+
+    results = run_sweep(args, datasets_to_run, sweep_values, param, logger, timestamp)
+    if results:
+        print_sweep_table(results, logger, title=f"SWEEP SUMMARY: {param.upper()}", sweep_param=param)
+        logger.info(f"[*] Artifacts saved to: {SWEEP_DIR}")
 
 if __name__ == "__main__":
     main()
