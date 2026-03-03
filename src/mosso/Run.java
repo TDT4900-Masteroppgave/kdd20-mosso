@@ -48,5 +48,11 @@ public class Run {
         }
         int edgeCount = Common.execute(module, inputPath, "\t");
         Common.writeOutputs(module, "output/" + outputPath, edgeCount);
+
+        // TODO : delete!! Only for debugging
+        if (sumMode.compareTo("mosso") == 0) {          
+            System.out.println("num_thresold_breaks: " + ((MoSSo) module).num_thresold_breaks);
+            System.out.println("total_trials: " + ((MoSSo) module).total_trials);
+        }
     }
 }
