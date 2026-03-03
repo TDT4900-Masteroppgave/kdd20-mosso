@@ -203,6 +203,7 @@ def parse_and_filter_args(script_type="benchmark"):
     parser.add_argument("--group", choices=["all"] + list(DATASETS.keys()), default="all")
     parser.add_argument("--algos", nargs='+', help="Specific algorithms to run (e.g. local baseline strat_1)")
     parser.add_argument("--keep-summaries", action="store_true")
+    parser.add_argument("--baseline", type=str, help="Algorithm to use as baseline for relative comparisons")
 
     if script_type == "sweep":
         parser.add_argument("--param", choices=list(SWEEP_CONFIG.keys()), required=True)
@@ -226,7 +227,51 @@ def parse_and_filter_args(script_type="benchmark"):
     else:
         ALGORITHMS.pop("local", None)
 
+    if args.baseline and args.baseline not in ALGORITHMS:
+        print(f"[!] The specified baseline '{args.baseline}' is not in the active algorithms list.")
+        exit(1)
+
     return args
+
+def format_dataframe_with_baseline(df, strategies, baseline_algo=None):
+    """Helper function to calculate inline relative % differences."""
+    display_df = df.copy()
+
+    for strat in strategies:
+        time_col, ratio_col = f"Time_{strat}", f"Ratio_{strat}"
+        formatted_times, formatted_ratios = [], []
+
+        for _, row in df.iterrows():
+            t_val, r_val = row.get(time_col), row.get(ratio_col)
+
+            # If a baseline is provided and this column IS NOT the baseline
+            if baseline_algo and baseline_algo in strategies and strat != baseline_algo:
+                t_base = row.get(f"Time_{baseline_algo}")
+                r_base = row.get(f"Ratio_{baseline_algo}")
+
+                # Format Time (Lower is better: -X% is faster)
+                if pd.notna(t_val) and pd.notna(t_base) and t_base > 0:
+                    pct_change = ((t_val - t_base) / t_base) * 100
+                    formatted_times.append(f"{t_val:.3f}s ({pct_change:+.1f}%)")
+                else:
+                    formatted_times.append(f"{t_val:.3f}s" if pd.notna(t_val) else "N/A")
+
+                # Format Ratio (Lower is better: -X% is more compression)
+                if pd.notna(r_val) and pd.notna(r_base) and r_base > 0:
+                    pct_change = ((r_val - r_base) / r_base) * 100
+                    formatted_ratios.append(f"{r_val:.5f} ({pct_change:+.2f}%)")
+                else:
+                    formatted_ratios.append(f"{r_val:.5f}" if pd.notna(r_val) else "N/A")
+
+            # Standard formatting if no baseline comparison applies
+            else:
+                formatted_times.append(f"{t_val:.3f}s" if pd.notna(t_val) else "N/A")
+                formatted_ratios.append(f"{r_val:.5f}" if pd.notna(r_val) else "N/A")
+
+        display_df[time_col] = formatted_times
+        display_df[ratio_col] = formatted_ratios
+
+    return display_df
 
 def get_datasets_to_run(args):
     """Deciding which datasets to process."""
@@ -241,63 +286,67 @@ def get_datasets_to_run(args):
                 datasets_to_run.append((url, filename))
     return datasets_to_run
 
-def print_sweep_table(results, logger, title="BENCHMARK SUMMARY", sweep_param=None):
-    df = pd.DataFrame(results)
 
-    display_df = df.copy()
-    new_cols = {}
-    for col in display_df.columns:
-        if col.startswith("Time_"):
-            new_cols[col] = f"{col.replace('Time_', '').capitalize()} Time"
-        elif col.startswith("Ratio_"):
-            new_cols[col] = f"{col.replace('Ratio_', '').capitalize()} Ratio"
-        else:
-            new_cols[col] = col.capitalize()
+def print_sweep_table(results, logger, title, sweep_param=None, baseline_algo=None):
+    df = pd.DataFrame(results)
+    strategies = [col.replace("Time_", "") for col in df.columns if col.startswith("Time_")]
+
+    display_df = format_dataframe_with_baseline(df, strategies, baseline_algo)
+
+    # Prettify Headers
+    new_cols = {c: f"{c.replace('Time_', '').capitalize()} Time" if c.startswith("Time_") else f"{c.replace('Ratio_', '').capitalize()} Ratio" if c.startswith("Ratio_") else c.capitalize() for c in display_df.columns}
     display_df.rename(columns=new_cols, inplace=True)
 
-    table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False, floatfmt=".4f")
+    table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False)
     line_width = len(table_str.split('\n')[0])
 
     logger.info("=" * line_width)
     logger.info(f"{title:^{line_width}}")
     logger.info("=" * line_width)
-    logger.info(table_str)
 
-    # Generate Averages Grouped by the Parameter
+    for line in table_str.split('\n'):
+        logger.info(line)
+
+    # Average table
     logger.info("=" * line_width)
     logger.info(f"{'AVERAGES BY PARAMETER VALUE':^{line_width}}")
     logger.info("=" * line_width)
 
-    pretty_param = sweep_param.capitalize()
-    avg_df = display_df.groupby(pretty_param).mean(numeric_only=True).reset_index()
+    avg_df = df.groupby(sweep_param).mean(numeric_only=True).reset_index()
     avg_df.insert(0, 'Dataset', 'ALL (Avg)')
 
-    avg_table_str = tabulate(avg_df, headers='keys', tablefmt='grid', showindex=False, floatfmt=".4f")
-    logger.info(avg_table_str)
+    display_avg = format_dataframe_with_baseline(avg_df, strategies, baseline_algo)
 
-def print_benchmark_table(results, logger, title="BENCHMARK SUMMARY"):
+    # Prettify Headers
+    new_cols[sweep_param] = sweep_param.capitalize()
+    display_avg.rename(columns=new_cols, inplace=True)
+
+    avg_table_str = tabulate(display_avg, headers='keys', tablefmt='grid', showindex=False)
+
+    for line in avg_table_str.split('\n'):
+        logger.info(line)
+
+def print_benchmark_table(results, logger, title, baseline_algo=None):
     df = pd.DataFrame(results)
+    strategies = [col.replace("Time_", "") for col in df.columns if col.startswith("Time_")]
 
-    display_df = df.copy()
-    new_cols = {}
-    for col in display_df.columns:
-        if col.startswith("Time_"):
-            new_cols[col] = f"{col.replace('Time_', '').capitalize()} Time"
-        elif col.startswith("Ratio_"):
-            new_cols[col] = f"{col.replace('Ratio_', '').capitalize()} Ratio"
-        else:
-            new_cols[col] = col.capitalize()
+    if "Dataset" in df.columns and len(df.columns) > 2 and "Dataset" == df.columns[0]:
+        avg_row = df.mean(numeric_only=True).to_dict()
+        avg_row['Dataset'] = 'AVERAGE'
+        df = pd.concat([df, pd.DataFrame([avg_row])], ignore_index=True)
+
+    display_df = format_dataframe_with_baseline(df, strategies, baseline_algo)
+
+    # Prettify Headers
+    new_cols = {c: f"{c.replace('Time_', '').capitalize()} Time" if c.startswith("Time_") else f"{c.replace('Ratio_', '').capitalize()} Ratio" if c.startswith("Ratio_") else c.capitalize() for c in display_df.columns}
     display_df.rename(columns=new_cols, inplace=True)
 
-    if "Dataset" in display_df.columns and len(display_df.columns) > 2 and "Dataset" == display_df.columns[0]:
-        avg_row = display_df.mean(numeric_only=True).to_dict()
-        avg_row['Dataset'] = 'AVERAGE'
-        display_df = pd.concat([display_df, pd.DataFrame([avg_row])], ignore_index=True)
-
-    table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False, floatfmt=".4f")
+    table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False)
     line_width = len(table_str.split('\n')[0])
 
-    logger.info("=" * line_width)
+    logger.info("=" * line_width )
     logger.info(f"{title:^{line_width}}")
     logger.info("=" * line_width)
-    logger.info(table_str)
+
+    for line in table_str.split('\n'):
+        logger.info(line)

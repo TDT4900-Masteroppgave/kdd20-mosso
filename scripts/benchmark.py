@@ -65,7 +65,7 @@ def main():
 
     results = run_suite(args, datasets_to_run, logger, timestamp)
     if results:
-        print_benchmark_table(results, logger, title="BENCHMARK SUMMARY")
+        print_benchmark_table(results, logger, title="BENCHMARK SUMMARY", baseline_algo=args.baseline)
         csv_file = os.path.join(BENCHMARK_DIR, f"results_{timestamp}.csv")
         pd.DataFrame(results).to_csv(csv_file, index=False)
         plot_results(csv_file, os.path.join(BENCHMARK_DIR, f"comparison_{timestamp}.pdf"), logger)

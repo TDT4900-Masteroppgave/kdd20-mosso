@@ -71,7 +71,7 @@ def main():
 
     results = run_sweep(args, datasets_to_run, sweep_values, param, logger, timestamp)
     if results:
-        print_sweep_table(results, logger, title=f"SWEEP SUMMARY: {param.upper()}", sweep_param=param)
+        print_sweep_table(results, logger, title=f"SWEEP SUMMARY: {param.upper()}", sweep_param=param, baseline_algo=args.baseline)
         logger.info(f"[*] Artifacts saved to: {SWEEP_DIR}")
 
 if __name__ == "__main__":

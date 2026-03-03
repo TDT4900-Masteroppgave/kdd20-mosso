@@ -72,11 +72,10 @@ def plot_parameter_analysis(csv_file, param_name, plot_file):
     for idx, strat in enumerate(strategies):
         marker = markers[idx % len(markers)]
         color = colors[idx]
-        is_baseline = (strat == "baseline")
 
         # Style baseline as a dashed line to stand out
-        line_style = '--' if is_baseline else '-'
-        line_width = 2 if is_baseline else 2.5
+        line_style ='-'
+        line_width = 2.5
 
         axes[0].plot(avg_df[param_name], avg_df[f'Ratio_{strat}'], marker=marker, linestyle=line_style, color=color, linewidth=line_width, markersize=8, label=strat)
         axes[1].plot(avg_df[param_name], avg_df[f'Time_{strat}'], marker=marker, linestyle=line_style, color=color, linewidth=line_width, markersize=8, label=strat)
