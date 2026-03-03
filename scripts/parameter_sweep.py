@@ -164,16 +164,20 @@ def main():
     parser.add_argument("--b", type=int, default=SWEEP_CONFIG["b"]["default"])
     parser.add_argument("--interval", type=int, default=1000)
     parser.add_argument("--group", choices=["all"] + list(DATASETS.keys()), default="all")
+    parser.add_argument("--local", action="store_true", help="Compile and test local code")
 
     args = parser.parse_args()
     logger, log_file, timestamp = setup_logging(f"sweep_{args.param}")
+
+    if not args.local:
+        ALGORITHMS.pop("Local", None)
 
     logger.info("="*60)
     logger.info(f"{'STAGE 1: SETUP & COMPILATION':^60}")
     logger.info("="*60)
 
     setup_directories()
-    build_jars(args.skip_build, logger)
+    build_jars(args.skip_build, args.local, logger)
     run_sweep(args, logger, timestamp)
 
 if __name__ == "__main__":

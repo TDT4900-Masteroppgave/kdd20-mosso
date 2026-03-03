@@ -3,6 +3,7 @@ import subprocess
 import urllib.request
 import gzip
 import glob
+
 from config import *
 import logging
 import sys
@@ -20,7 +21,7 @@ def setup_directories():
         os.makedirs(d, exist_ok=True)
 
 
-def build_jars(skip_build, logger):
+def build_jars(skip_build, is_local, logger):
     if skip_build:
         return
 
@@ -29,9 +30,25 @@ def build_jars(skip_build, logger):
         logger.error(f"[!] Error: {fastutil} missing. Download it to root first.")
         exit(1)
 
+    if is_local:
+        logger.info("[*] Compiling current Local code...")
+        try:
+            subprocess.run(["bash", "compile.sh"], cwd=".", check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+            shutil.move("mosso-1.0.jar", "mosso-Local.jar")
+            logger.info("\t[OK] Successfully built mosso-Local.jar")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"\t[!] Failed to build Local code. Compile Error: {e.stderr.strip()}")
+            return
+        except Exception as e:
+            logger.error(f"\t[!] Unexpected error building Local code: {e}")
+            return
+
     logger.info("[*] Compiling all configured algorithms...")
 
     for algo_name, config in ALGORITHMS.items():
+        if algo_name == "Local":
+            continue
+
         repo_url = config['repo']
         branch = config['branch']
         jar_name = f"mosso-{algo_name}.jar"
@@ -57,8 +74,10 @@ def build_jars(skip_build, logger):
             logger.error(f"      [!] Failed to build {algo_name}. Git/Compile Error: {e.stderr.strip()}")
             if os.path.exists(target_dir):
                 shutil.rmtree(target_dir) # Clean up broken clones
+            return
         except Exception as e:
             logger.error(f"      [!] Unexpected error building {algo_name}: {e}")
+            return
 
     logger.info("[*] All requested Java compilations finished")
 
