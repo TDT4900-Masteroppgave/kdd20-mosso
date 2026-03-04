@@ -184,7 +184,7 @@ def setup_logging(run_type):
     return logger, timestamp
 
 def format_dataframe_with_baseline(df, strategies, baseline_algo=None):
-    """Helper function to calculate inline relative % differences."""
+    """Helper function to calculate inline relative performance factors."""
     display_df = df.copy()
 
     for strat in strategies:
@@ -199,17 +199,17 @@ def format_dataframe_with_baseline(df, strategies, baseline_algo=None):
                 t_base = row.get(f"Time_{baseline_algo}")
                 r_base = row.get(f"Ratio_{baseline_algo}")
 
-                # Format Time (Lower is better: -X% is faster)
-                if pd.notna(t_val) and pd.notna(t_base) and t_base > 0:
-                    pct_change = ((t_val - t_base) / t_base) * 100
-                    formatted_times.append(f"{t_val:.3f}s ({pct_change:+.1f}%)")
+                # Format Time (Speedup Factor: > 1.0x is faster, < 1.0x is slower)
+                if pd.notna(t_val) and pd.notna(t_base) and t_val > 0:
+                    speedup = t_base / t_val
+                    formatted_times.append(f"{t_val:.3f}s ({speedup:.2f}x)")
                 else:
                     formatted_times.append(f"{t_val:.3f}s" if pd.notna(t_val) else "N/A")
 
-                # Format Ratio (Lower is better: -X% is more compression)
+                # Format Ratio (Multiplier: < 1.0x is better compression)
                 if pd.notna(r_val) and pd.notna(r_base) and r_base > 0:
-                    pct_change = ((r_val - r_base) / r_base) * 100
-                    formatted_ratios.append(f"{r_val:.5f} ({pct_change:+.2f}%)")
+                    ratio_mult = r_val / r_base
+                    formatted_ratios.append(f"{r_val:.5f} ({ratio_mult:.2f}x)")
                 else:
                     formatted_ratios.append(f"{r_val:.5f}" if pd.notna(r_val) else "N/A")
 
