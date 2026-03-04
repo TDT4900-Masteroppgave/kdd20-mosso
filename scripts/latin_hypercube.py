@@ -4,7 +4,7 @@ from tabulate import tabulate
 from scipy.stats import qmc
 
 from config import PARAM_CONFIG, OUTPUT_DIR
-from plotter import plot_pareto_front
+from plotter import plot_pareto_front, get_pareto_front_2d
 from utils import prepare_dataset, download_and_prepare_dataset, run_multiple_mosso
 from benchmark import Benchmark
 
@@ -73,12 +73,14 @@ class LHSBenchmark(Benchmark):
         self.results = results
 
     def print_table(self):
-        # Convert to DataFrame, sort by best ratio, and print the Top 10 configurations!
         df = pd.DataFrame(self.results)
-        top_configs = df.sort_values(by="Ratio", ascending=True).head(10)
 
-        self.logger.info("\n--- OPTIMIZED CONFIGURATIONS (LHS) ---")
-        table_str = tabulate(top_configs, headers='keys', tablefmt='grid', showindex=False)
+        pareto_df = get_pareto_front_2d(df, 'Time', 'Ratio')
+
+        pareto_df = pareto_df.sort_values(by="Time", ascending=True)
+
+        self.logger.info("\n--- PARETO OPTIMAL CONFIGURATIONS (LHS) ---")
+        table_str = tabulate(pareto_df, headers='keys', tablefmt='grid', showindex=False)
         for line in table_str.split('\n'):
             self.logger.info(line)
 
