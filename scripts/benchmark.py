@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from config import ALGORITHMS, BENCHMARK_DIR, RUNS_DIR
+from config import ALGORITHMS, BENCHMARK_DIR, RUNS_DIR, PARAM_CONFIG
 from utils import setup_logging, setup_directories, build_jars, download_and_prepare_dataset, prepare_dataset, \
     parse_and_filter_args, get_datasets_to_run, print_benchmark_table
 from run_mosso import run_multiple_mosso
@@ -27,12 +27,10 @@ def run_suite(args, datasets_to_run, logger, timestamp):
 
             template = algo_config.get('template')
             params = algo_config.get('params', {})
-            resolved_params = {
-                "samples": params.get('samples', args.samples),
-                "escape": params.get('escape', args.escape),
-                "b": params.get('b', args.b),
-                "interval": params.get('interval', args.interval)
-            }
+
+            resolved_params = {"interval": params.get('interval', args.interval)}
+            for p_key in PARAM_CONFIG.keys():
+                resolved_params[p_key] = params.get(p_key, getattr(args, p_key))
 
             t_avg, r_avg, t_list, r_list = run_multiple_mosso(
                 jar_file, path, f"{algo_name}_{dataset_name}_{timestamp}",

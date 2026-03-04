@@ -10,13 +10,9 @@ def run_mosso(jar_file, dataset_path, output_name, discard_summaries, logger, pa
     out_file = os.path.join(RUNS_DIR, output_name)
     log_file = f"{out_file}.log"
 
-    # Base Java command
     cmd = ["java", "-cp", classpath, "mosso.Run", dataset_path, output_name, "mosso"]
-
     for param_key in template:
         cmd.append(str(parameters[param_key]))
-
-    logger.debug(f"Executing: {' '.join(cmd)}")
 
     try:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
@@ -31,6 +27,8 @@ def run_mosso(jar_file, dataset_path, output_name, discard_summaries, logger, pa
 
         if process.returncode != 0:
             logger.error(f"[!] Java error for {output_name}: Code {process.returncode}")
+            full_error = "".join(output_lines)
+            logger.debug(full_error)
             return None, None
 
         java_output_file = os.path.join("output", output_name)

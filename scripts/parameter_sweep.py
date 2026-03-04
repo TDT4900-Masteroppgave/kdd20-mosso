@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from config import ALGORITHMS, SWEEP_DIR, SWEEP_CONFIG
+from config import ALGORITHMS, SWEEP_DIR, PARAM_CONFIG
 from utils import setup_logging, setup_directories, build_jars, download_and_prepare_dataset, prepare_dataset, \
     parse_and_filter_args, get_datasets_to_run, print_sweep_table
 from run_mosso import run_multiple_mosso
@@ -31,12 +31,13 @@ def run_sweep(args, datasets_to_run, sweep_values, param, logger, timestamp):
 
                 template = algo_config.get('template', [])
                 params = algo_config.get('params', {})
+
                 resolved_params = {
-                    "samples": params.get('samples', samples),
-                    "escape": params.get('escape', escape),
-                    "b": params.get('b', b),
                     "interval": params.get('interval', args.interval)
                 }
+                for p_key in PARAM_CONFIG.keys():
+                    current_fallback = val if param == p_key else getattr(args, p_key)
+                    resolved_params[p_key] = params.get(p_key, current_fallback)
 
                 t, r, _, _ = run_multiple_mosso(
                     jar_file, path, f"{algo_name}_{dataset_name}_{param}{val}_{timestamp}",
@@ -66,7 +67,7 @@ def main():
 
     logger.info("=" * 10 + f"{' STAGE 2: SWEEP PROCESSING ':^10}" + "=" * 10)
     datasets_to_run = get_datasets_to_run(args)
-    param, config = args.param, SWEEP_CONFIG[args.param]
+    param, config = args.param, PARAM_CONFIG[args.param]
     sweep_values = list(range(*args.range)) if args.range else (args.values if args.values else config["values"])
 
     results = run_sweep(args, datasets_to_run, sweep_values, param, logger, timestamp)
