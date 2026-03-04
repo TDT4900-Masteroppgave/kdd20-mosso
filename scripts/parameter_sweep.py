@@ -1,79 +1,96 @@
 import os
 import pandas as pd
+
 from config import ALGORITHMS, SWEEP_DIR, PARAM_CONFIG
-from utils import setup_logging, setup_directories, build_jars, download_and_prepare_dataset, prepare_dataset, \
-    parse_and_filter_args, get_datasets_to_run, print_sweep_table
+from utils import download_and_prepare_dataset, prepare_dataset, print_sweep_table
 from run_mosso import run_multiple_mosso
 from plotter import plot_parameter_analysis
 
+from benchmark import Benchmark
 
-def run_sweep(args, datasets_to_run, sweep_values, param, logger, timestamp):
-    results = []
+class ParameterSweepBenchmark(Benchmark):
+    def __init__(self):
+        super().__init__("sweep", SWEEP_DIR)
 
-    for val in sweep_values:
-        logger.info(f"--- Testing {param.upper()} = {val} ---")
-        samples = val if param == "samples" else args.samples
-        escape = val if param == "escape" else args.escape
-        b = val if param == "b" else args.b
+        config = PARAM_CONFIG[self.args.param]
+        self.sweep_values = list(range(*self.args.range)) if self.args.range else (
+            self.args.values if self.args.values else config["values"])
 
-        for i, (url, filename) in enumerate(datasets_to_run, 1):
-            dataset_name = filename.replace(".txt", "").replace(".csv", "")
-            path = prepare_dataset(filename, logger) if url == "local" else download_and_prepare_dataset(url, filename,
-                                                                                                         logger)
-            if not path: continue
+    def add_custom_args(self, parser):
+        parser.add_argument("--param", choices=list(PARAM_CONFIG.keys()), required=True)
+        parser.add_argument("--range", type=int, nargs=3)
 
-            logger.info(f"[{i}/{len(datasets_to_run)}] Running {dataset_name} ({args.runs} runs) ...")
-            current_result = {"Dataset": dataset_name, param: val}
+    def get_log_prefix(self):
+        return f"sweep_{self.args.param}"
 
-            for algo_name, algo_config in ALGORITHMS.items():
-                jar_file = f"mosso-{algo_name}.jar"
-                if not os.path.exists(jar_file): continue
+    def get_algo_param_display(self, p_key, default_val):
+        if self.args.param == p_key:
+            range_str = self.args.range if self.args.range else self.args.values
+            return f"SWEEPING {range_str}"
+        return default_val
 
-                template = algo_config.get('template', [])
-                params = algo_config.get('params', {})
+    def process(self):
+        args = self.args
+        logger = self.logger
+        datasets_to_run = self.datasets_to_run
+        timestamp = self.timestamp
+        param = self.args.param
 
-                resolved_params = {
-                    "interval": params.get('interval', args.interval)
-                }
-                for p_key in PARAM_CONFIG.keys():
-                    current_fallback = val if param == p_key else getattr(args, p_key)
-                    resolved_params[p_key] = params.get(p_key, current_fallback)
+        results = []
 
-                t, r, _, _ = run_multiple_mosso(
-                    jar_file, path, f"{algo_name}_{dataset_name}_{param}{val}_{timestamp}",
-                    args.runs, True, logger, resolved_params, template)
+        for val in self.sweep_values:
+            logger.info(f"--- Testing {param.upper()} = {val} ---")
 
-                if t is not None:
-                    current_result[f"Time_{algo_name}"], current_result[f"Ratio_{algo_name}"] = t, r
-                    logger.info(f"\t=> {algo_name: <12} Time: {t:.3f}s | Ratio: {r:.5f}")
+            for i, (url, filename) in enumerate(datasets_to_run, 1):
+                dataset_name = filename.replace(".txt", "").replace(".csv", "")
+                path = prepare_dataset(filename, logger) if url == "local" else download_and_prepare_dataset(url,
+                                                                                                             filename,
+                                                                                                             logger)
+                if not path: continue
 
-            results.append(current_result)
+                logger.info(f"[{i}/{len(datasets_to_run)}] Running {dataset_name} ({args.runs} runs) ...")
+                current_result = {"Dataset": dataset_name, param: val}
 
-        if results:
-            master_csv = os.path.join(SWEEP_DIR, f"sweep_{param}_results_{timestamp}.csv")
-            pd.DataFrame(results).to_csv(master_csv, index=False)
-            plot_parameter_analysis(master_csv, param, os.path.join(SWEEP_DIR, f"sweep_{param}_plot_{timestamp}.pdf"))
+                for algo_name, algo_config in ALGORITHMS.items():
+                    jar_file = f"mosso-{algo_name}.jar"
+                    if not os.path.exists(jar_file): continue
 
-    return results
+                    template = algo_config.get('template', [])
+                    params = algo_config.get('params', {})
 
+                    resolved_params = {
+                        "interval": params.get('interval', args.interval)
+                    }
+                    for p_key in PARAM_CONFIG.keys():
+                        current_fallback = val if param == p_key else getattr(args, p_key)
+                        resolved_params[p_key] = params.get(p_key, current_fallback)
 
-def main():
-    args = parse_and_filter_args(script_type="sweep")
-    logger, timestamp = setup_logging(f"sweep_{args.param}")
+                    t, r, _, _ = run_multiple_mosso(
+                        jar_file, path, f"{algo_name}_{dataset_name}_{param}{val}_{timestamp}",
+                        args.runs, True, logger, resolved_params, template)
 
-    logger.info("=" * 10 + f"{' STAGE 1: SETUP & COMPILATION ':^10}" + "=" * 10)
-    setup_directories()
-    build_jars(args.skip_build, args.local, logger)
+                    if t is not None:
+                        current_result[f"Time_{algo_name}"], current_result[f"Ratio_{algo_name}"] = t, r
+                        logger.info(f"\t=> {algo_name: <12} Time: {t:.3f}s | Ratio: {r:.5f}")
 
-    logger.info("=" * 10 + f"{' STAGE 2: SWEEP PROCESSING ':^10}" + "=" * 10)
-    datasets_to_run = get_datasets_to_run(args)
-    param, config = args.param, PARAM_CONFIG[args.param]
-    sweep_values = list(range(*args.range)) if args.range else (args.values if args.values else config["values"])
+                results.append(current_result)
 
-    results = run_sweep(args, datasets_to_run, sweep_values, param, logger, timestamp)
-    if results:
-        print_sweep_table(results, logger, title=f"SWEEP SUMMARY: {param.upper()}", sweep_param=param, baseline_algo=args.baseline)
-        logger.info(f"[*] Artifacts saved to: {SWEEP_DIR}")
+            if results:
+                master_csv = os.path.join(SWEEP_DIR, f"sweep_{param}_results_{timestamp}.csv")
+                pd.DataFrame(results).to_csv(master_csv, index=False)
+                plot_parameter_analysis(master_csv, param,
+                                        os.path.join(SWEEP_DIR, f"sweep_{param}_plot_{timestamp}.pdf"))
+
+        self.results = results
+
+    def finalize(self):
+        args = self.args
+        logger = self.logger
+        results = self.results
+        param = self.args.param
+
+        print_sweep_table(results, logger, title=f"SWEEP SUMMARY: {param.upper()}", sweep_param=param,
+                          baseline_algo=args.baseline)
 
 if __name__ == "__main__":
-    main()
+    ParameterSweepBenchmark().run()

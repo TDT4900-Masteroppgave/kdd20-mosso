@@ -8,4 +8,4 @@ cd "$(dirname "$0")"
 source setup.sh
 
 # Run the Python script
-python3 scripts/benchmark.py "$@"
+python3 scripts/compare.py "$@"

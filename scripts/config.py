@@ -15,40 +15,44 @@ JAR_HYBRID = "mosso-hybrid.jar"
 ORIGINAL_REPO_URL = "https://github.com/jihoonko/kdd20-mosso"
 BASE_REPO_URL = "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git"
 
+PARAM_CONFIG = {
+    "c": {"description":"sample number", "default": 120},
+    "e": {"description":"escape", "default": 3},
+    "interval": {"description":"interval", "default": 1000},
+    "b": {"description":"top candidates","default": 5}
+}
+
 ALGORITHMS = {
     "local": {
-        "template": ["escape", "samples", "interval", "b"]
+        "template": ["c", "e", "interval"]
     },
     "kdd20-mosso": {
         "repo": "https://github.com/jihoonko/kdd20-mosso.git",
         "branch": "master",
-        "params" : {"samples": 120, "escape": 3},
-        "template": ["escape", "samples", "interval"]
+        "params" : {"c": 120, "e": 3},
+        "template": ["c", "e", "interval"]
     },
     "strat_1": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1",
-        "template": ["escape", "samples", "interval"]
+        "template": ["c", "e", "interval"]
     },
     "strat_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_2",
-        "template": ["escape", "samples", "interval"]
+        "template": ["c", "e", "interval"]
     },
     "strat_1_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1_2",
-        "template": ["escape", "samples", "interval", "b"]
+        "template": ["c", "e", "interval", "b"]
     },
 }
 
-PARAM_CONFIG = {
-    "samples": {"values": [i for i in range(10, 240, 10)], "default": 120},
-    "escape": {"values": [i for i in range(1, 9, 2)], "default": 3},
-    "b": {"values": [i for i in range(1, 10, 2)], "default": 5}
-}
-
 DATASETS = {
+    "one": [
+        ("https://snap.stanford.edu/data/as-caida20071105.txt.gz", "as-caida20071105.txt")
+    ],
     "small": [
         ("https://snap.stanford.edu/data/as-caida20071105.txt.gz", "as-caida20071105.txt"),
         ("https://snap.stanford.edu/data/email-Enron.txt.gz", "Email-Enron.txt"),

@@ -14,6 +14,7 @@ def run_mosso(jar_file, dataset_path, output_name, discard_summaries, logger, pa
     for param_key in template:
         cmd.append(str(parameters[param_key]))
 
+    logger.debug(f"Running: {' '.join(cmd)}")
     try:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         output_lines = []

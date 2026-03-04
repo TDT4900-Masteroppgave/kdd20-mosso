@@ -4,7 +4,6 @@ import subprocess
 import urllib.request
 import gzip
 import glob
-import argparse
 import pandas as pd
 from tabulate import tabulate
 
@@ -25,10 +24,7 @@ def setup_directories():
         os.makedirs(d, exist_ok=True)
 
 
-def build_jars(skip_build, is_local, logger):
-    if skip_build:
-        return
-
+def build_jars(is_local, logger):
     fastutil = get_fastutil_path()
     if not os.path.exists(fastutil):
         logger.error(f"[!] Error: {fastutil} missing. Download it to root first.")
@@ -47,7 +43,7 @@ def build_jars(skip_build, is_local, logger):
             logger.error(f"\t[!] Unexpected error building Local code: {e}")
             return
 
-    logger.info("[*] Compiling all configured algorithms...")
+    logger.info("[*] Compiling configured algorithms...")
 
     for algo_name, config in ALGORITHMS.items():
         if algo_name == "local":
@@ -72,18 +68,16 @@ def build_jars(skip_build, is_local, logger):
             shutil.copy(fastutil, os.path.join(target_dir, fastutil))
             subprocess.run(["bash", "compile.sh"], cwd=target_dir, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
             shutil.move(os.path.join(target_dir, "mosso-1.0.jar"), jar_name)
-            logger.info(f"      [OK] Successfully built {jar_name}")
+            logger.info(f"\t[OK] Successfully built {jar_name}")
 
         except subprocess.CalledProcessError as e:
-            logger.error(f"      [!] Failed to build {algo_name}. Git/Compile Error: {e.stderr.strip()}")
+            logger.error(f"\t[!] Failed to build {algo_name}. Git/Compile Error: {e.stderr.strip()}")
             if os.path.exists(target_dir):
                 shutil.rmtree(target_dir) # Clean up broken clones
             return
         except Exception as e:
-            logger.error(f"      [!] Unexpected error building {algo_name}: {e}")
+            logger.error(f"\t[!] Unexpected error building {algo_name}: {e}")
             return
-
-    logger.info("[*] All requested Java compilations finished")
 
 
 def prepare_dataset(filepath, logger):
@@ -189,49 +183,6 @@ def setup_logging(run_type):
     sys.excepthook = handle_exception
 
     return logger, timestamp
-
-def parse_and_filter_args(script_type="benchmark"):
-    """CLI parsing and ALGORITHM dictionary filtering."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--file", type=str, help="Specific local graph file.")
-    parser.add_argument("--skip-build", action="store_true")
-    parser.add_argument("--interval", type=int, default=1000)
-    parser.add_argument("--runs", type=int, default=1)
-    parser.add_argument("--group", choices=["all"] + list(DATASETS.keys()), default="all")
-    parser.add_argument("--algos", nargs='+', help="Specific algorithms to run (e.g. local baseline strat_1)")
-    parser.add_argument("--keep-summaries", action="store_true")
-    parser.add_argument("--baseline", type=str, help="Algorithm to use as baseline for relative comparisons")
-
-    for p_name, p_data in PARAM_CONFIG.items():
-        parser.add_argument(f"--{p_name}", type=type(p_data["default"]), default=p_data["default"])
-
-    if script_type == "sweep":
-        parser.add_argument("--param", choices=list(PARAM_CONFIG.keys()), required=True)
-        parser.add_argument("--range", type=int, nargs=3)
-        parser.add_argument("--values", type=int, nargs='+')
-
-    args = parser.parse_args()
-    args.local = False
-
-    # Filter ALGORITHMS
-    if args.algos:
-        if "local" in args.algos:
-            args.local = True
-        for a in args.algos:
-            if a not in ALGORITHMS.keys():
-                print(f"[!] Unknown algorithm: {a}. Available options: {list(ALGORITHMS.keys())}")
-                exit(1)
-        for key in list(ALGORITHMS.keys()):
-            if key not in args.algos:
-                ALGORITHMS.pop(key, None)
-    else:
-        ALGORITHMS.pop("local", None)
-
-    if args.baseline and args.baseline not in ALGORITHMS:
-        print(f"[!] The specified baseline '{args.baseline}' is not in the active algorithms list.")
-        exit(1)
-
-    return args
 
 def format_dataframe_with_baseline(df, strategies, baseline_algo=None):
     """Helper function to calculate inline relative % differences."""
