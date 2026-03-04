@@ -42,6 +42,12 @@ ALGORITHMS = {
     },
 }
 
+PARAM_CONFIG = {
+    "samples": {"values": [i for i in range(10, 240, 10)], "default": 120},
+    "escape": {"values": [i for i in range(1, 9, 2)], "default": 3},
+    "b": {"values": [i for i in range(1, 10, 2)], "default": 5}
+}
+
 DATASETS = {
     "small": [
         ("https://snap.stanford.edu/data/as-caida20071105.txt.gz", "as-caida20071105.txt"),
@@ -57,10 +63,4 @@ DATASETS = {
         ("https://snap.stanford.edu/data/as-skitter.txt.gz", "as-skitter.txt"),
         ("https://snap.stanford.edu/data/bigdata/communities/com-lj.ungraph.txt.gz", "com-lj.ungraph.txt")
     ]
-}
-
-SWEEP_CONFIG = {
-    "samples": {"values": [i for i in range(10, 240, 10)], "default": 120},
-    "escape": {"values": [i for i in range(1, 9, 2)], "default": 3},
-    "b": {"values": [i for i in range(1, 10, 2)], "default": 5}
 }
