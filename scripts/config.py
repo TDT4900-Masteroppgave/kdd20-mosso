@@ -24,28 +24,28 @@ PARAM_CONFIG = {
 
 ALGORITHMS = {
     "local": {
-        "template": ["c", "e", "interval"]
+        "template": ["e", "c", "interval"]
     },
     "kdd20-mosso": {
         "repo": "https://github.com/jihoonko/kdd20-mosso.git",
         "branch": "master",
         "params" : {"c": 120, "e": 3},
-        "template": ["c", "e", "interval"]
+        "template": ["e", "c", "interval"]
     },
     "strat_1": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1",
-        "template": ["c", "e", "interval"]
+        "template": ["e", "c", "interval"]
     },
     "strat_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_2",
-        "template": ["c", "e", "interval"]
+        "template": ["e", "c", "interval"]
     },
     "strat_1_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1_2",
-        "template": ["c", "e", "interval", "b"]
+        "template": ["e", "c", "interval", "b"]
     },
 }
 
