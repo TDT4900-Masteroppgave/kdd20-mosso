@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from tabulate import tabulate
 
-from config import ALGORITHMS, BENCHMARK_DIR, RUNS_DIR, PARAM_CONFIG
+from config import BENCHMARK_DIR, RUNS_DIR, PARAM_CONFIG
 from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple_mosso
 from plotter import plot_results, plot_runs_variance
 from benchmark import Benchmark
