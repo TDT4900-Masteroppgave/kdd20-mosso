@@ -5,7 +5,6 @@ import urllib.request
 import gzip
 import glob
 import pandas as pd
-from tabulate import tabulate
 
 from config import *
 import logging
@@ -236,68 +235,3 @@ def get_datasets_to_run(args):
             for url, filename in DATASETS[args.group]:
                 datasets_to_run.append((url, filename))
     return datasets_to_run
-
-
-def print_sweep_table(results, logger, title, sweep_param=None, baseline_algo=None):
-    df = pd.DataFrame(results)
-    strategies = [col.replace("Time_", "") for col in df.columns if col.startswith("Time_")]
-
-    display_df = format_dataframe_with_baseline(df, strategies, baseline_algo)
-
-    # Prettify Headers
-    new_cols = {c: f"{c.replace('Time_', '').capitalize()} Time" if c.startswith("Time_") else f"{c.replace('Ratio_', '').capitalize()} Ratio" if c.startswith("Ratio_") else c.capitalize() for c in display_df.columns}
-    display_df.rename(columns=new_cols, inplace=True)
-
-    table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False)
-    line_width = len(table_str.split('\n')[0])
-
-    logger.info("=" * line_width)
-    logger.info(f"{title:^{line_width}}")
-    logger.info("=" * line_width)
-
-    for line in table_str.split('\n'):
-        logger.info(line)
-
-    # Average table
-    logger.info("=" * line_width)
-    logger.info(f"{'AVERAGES BY PARAMETER VALUE':^{line_width}}")
-    logger.info("=" * line_width)
-
-    avg_df = df.groupby(sweep_param).mean(numeric_only=True).reset_index()
-    avg_df.insert(0, 'Dataset', 'ALL (Avg)')
-
-    display_avg = format_dataframe_with_baseline(avg_df, strategies, baseline_algo)
-
-    # Prettify Headers
-    new_cols[sweep_param] = sweep_param.capitalize()
-    display_avg.rename(columns=new_cols, inplace=True)
-
-    avg_table_str = tabulate(display_avg, headers='keys', tablefmt='grid', showindex=False)
-
-    for line in avg_table_str.split('\n'):
-        logger.info(line)
-
-def print_benchmark_table(results, logger, title, baseline_algo=None):
-    df = pd.DataFrame(results)
-    strategies = [col.replace("Time_", "") for col in df.columns if col.startswith("Time_")]
-
-    if "Dataset" in df.columns and len(df.columns) > 2 and "Dataset" == df.columns[0]:
-        avg_row = df.mean(numeric_only=True).to_dict()
-        avg_row['Dataset'] = 'AVERAGE'
-        df = pd.concat([df, pd.DataFrame([avg_row])], ignore_index=True)
-
-    display_df = format_dataframe_with_baseline(df, strategies, baseline_algo)
-
-    # Prettify Headers
-    new_cols = {c: f"{c.replace('Time_', '').capitalize()} Time" if c.startswith("Time_") else f"{c.replace('Ratio_', '').capitalize()} Ratio" if c.startswith("Ratio_") else c.capitalize() for c in display_df.columns}
-    display_df.rename(columns=new_cols, inplace=True)
-
-    table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False)
-    line_width = len(table_str.split('\n')[0])
-
-    logger.info("=" * line_width )
-    logger.info(f"{title:^{line_width}}")
-    logger.info("=" * line_width)
-
-    for line in table_str.split('\n'):
-        logger.info(line)

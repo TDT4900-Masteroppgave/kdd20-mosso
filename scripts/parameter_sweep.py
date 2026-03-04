@@ -1,17 +1,18 @@
 import os
 import pandas as pd
+from tabulate import tabulate
 
 from config import ALGORITHMS, SWEEP_DIR, PARAM_CONFIG
-from utils import download_and_prepare_dataset, prepare_dataset, print_sweep_table
+from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline
 from run_mosso import run_multiple_mosso
 from plotter import plot_parameter_analysis
 
 from benchmark import Benchmark
 
+
 class ParameterSweepBenchmark(Benchmark):
     def __init__(self):
         super().__init__("sweep", SWEEP_DIR)
-
         config = PARAM_CONFIG[self.args.param]
         self.sweep_values = list(range(*self.args.range)) if self.args.range else (
             self.args.values if self.args.values else config["values"])
@@ -83,14 +84,26 @@ class ParameterSweepBenchmark(Benchmark):
 
         self.results = results
 
-    def finalize(self):
-        args = self.args
-        logger = self.logger
-        results = self.results
-        param = self.args.param
+    def print_table(self):
+        df = pd.DataFrame(self.results)
+        strategies = [col.replace("Time_", "") for col in df.columns if col.startswith("Time_")]
 
-        print_sweep_table(results, logger, title=f"SWEEP SUMMARY: {param.upper()}", sweep_param=param,
-                          baseline_algo=args.baseline)
+        self.logger.info(f"--- SWEEP LOG ({self.args.param.upper()}) ---")
+        display_df = format_dataframe_with_baseline(df, strategies, self.args.baseline)
+        table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False)
+        for line in table_str.split('\n'):
+            self.logger.info(line)
+
+        self.logger.info(f"--- AVERAGES BY {self.args.param.upper()} ---")
+        avg_df = df.groupby(self.args.param).mean(numeric_only=True).reset_index()
+        display_avg = format_dataframe_with_baseline(avg_df, strategies, self.args.baseline)
+        table_str = tabulate(display_avg, headers='keys', tablefmt='grid', showindex=False)
+        for line in table_str.split('\n'):
+            self.logger.info(line)
+
+    def finalize(self):
+        pass
+
 
 if __name__ == "__main__":
     ParameterSweepBenchmark().run()

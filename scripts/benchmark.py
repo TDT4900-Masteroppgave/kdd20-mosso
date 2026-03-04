@@ -73,6 +73,11 @@ class Benchmark(ABC):
         """Logic for saving artifacts."""
         pass
 
+    @abstractmethod
+    def print_table(self):
+        """Logic for formatting and printing the results table to the console."""
+        pass
+
     def setup(self):
         """Logic for setting up the benchmark environment."""
         self.datasets_to_run = get_datasets_to_run(self.args)
@@ -116,6 +121,7 @@ class Benchmark(ABC):
 
         if self.results:
             self.logger.info("=" * 10 + f"{' STAGE 3: RESULTS & ARTIFACTS ':^30}" + "=" * 10)
+            self.print_table()
             self.finalize()
             self.logger.info(f"[*] Artifacts saved to: {self.save_dir}")
         else:

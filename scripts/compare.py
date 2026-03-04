@@ -1,11 +1,14 @@
 import os
 import pandas as pd
+from tabulate import tabulate
+
 from config import ALGORITHMS, BENCHMARK_DIR, RUNS_DIR, PARAM_CONFIG
-from utils import download_and_prepare_dataset, prepare_dataset, print_benchmark_table
+from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline
 from run_mosso import run_multiple_mosso
 from plotter import plot_results, plot_runs_variance
 
 from benchmark import Benchmark
+
 
 class CompareBenchmark(Benchmark):
     def __init__(self):
@@ -15,10 +18,7 @@ class CompareBenchmark(Benchmark):
         parser.add_argument("--keep-summaries", action="store_true")
 
     def get_log_prefix(self):
-        return self.benchmark_type
-
-    def get_algo_param_display(self, p_key, default_val):
-        return default_val
+        return "compare"
 
     def process(self):
         args = self.args
@@ -67,16 +67,23 @@ class CompareBenchmark(Benchmark):
 
         self.results = results
 
-    def finalize(self):
-        args = self.args
-        logger = self.logger
-        results = self.results
-        timestamp = self.timestamp
+    def print_table(self):
+        df = pd.DataFrame(self.results)
+        strategies = [col.replace("Time_", "") for col in df.columns if col.startswith("Time_")]
 
-        print_benchmark_table(results, logger, title="BENCHMARK SUMMARY", baseline_algo=args.baseline)
-        csv_file = os.path.join(BENCHMARK_DIR, f"results_{timestamp}.csv")
-        pd.DataFrame(results).to_csv(csv_file, index=False)
-        plot_results(csv_file, os.path.join(BENCHMARK_DIR, f"comparison_{timestamp}.pdf"), logger)
+        avg_row = df.mean(numeric_only=True).to_dict()
+        avg_row['Dataset'] = 'AVERAGE'
+        df = pd.concat([df, pd.DataFrame([avg_row])], ignore_index=True)
+
+        display_df = format_dataframe_with_baseline(df, strategies, self.args.baseline)
+        table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False)
+        for line in table_str.split('\n'):
+            self.logger.info(line)
+
+    def finalize(self):
+        csv_file = os.path.join(self.save_dir, f"results_{self.timestamp}.csv")
+        pd.DataFrame(self.results).to_csv(csv_file, index=False)
+        plot_results(csv_file, os.path.join(self.save_dir, f"plot_{self.timestamp}.pdf"), self.logger)
 
 
 if __name__ == "__main__":
