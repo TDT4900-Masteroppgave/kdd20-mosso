@@ -325,6 +325,82 @@ public class MoSSo extends SupernodeHelper {
         }
     }
 
+    
+    /**
+     * MAGS-DM: Calculate estimated Jaccard similarity between two nodes
+     * by comparing their multiple MinHash signatures.
+     */
+    private double calculateMH(int u, int v, double currentBestSim) {
+        int matches = 0;
+        for (int i = 0; i < n_hash; i++) {
+            if (minHash[i].getInt(u) == minHash[i].getInt(v)) {
+                matches++;
+            }
+
+            // OPTIMIZATION: Short-circuit
+            // If the remaining hashes can't possibly result in a better score, stop.
+            int remaining = n_hash - (i + 1);
+            if (((double) matches + remaining) / n_hash < currentBestSim) {
+                return -1.0; // Fail early
+            }
+        }
+        return (double) matches / n_hash;
+    }
+
+    private void _divide_and_merge(final int dst, IntArrayList srcnbd, final int which) {
+        // divide noed into paritions using min hash e.g. coarse clustering
+        Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
+        if(getDegree(dst) > 0) srcnbd.set(0, dst);
+        // coarse clustering using minhash
+        for (int v : srcnbd) {
+            long target = minHash[which].getInt(v);
+            if (!srcGrp.containsKey(target)) srcGrp.put(target, new IntArrayList());
+            srcGrp.get(target).add(v);
+        }
+
+        // for each partition
+        for (IntArrayList partition : srcGrp.values()) {
+            // while partiotion is not empty (contains nodes to merge)
+            while (!partition.isEmpty()) {
+                // picks (and remove) a random node from the partition
+                int rand_index = randInt(0, partition.size()-1);
+                int testing_node = partition.getInt(rand_index);
+                partition.removeInt(rand_index);
+
+                if (randInt(1, getDegree(testing_node)) <= 1) {
+                
+                    // MAGS-DM: Similarity Measure
+                    int bestTarget = -1;
+                    double maxSimilarity = -1.0;
+
+                    for (int candidate : partition) {
+                        if (candidate == testing_node) continue;
+
+                        double similarity = calculateMH(testing_node, candidate, maxSimilarity);
+
+                        if (similarity > maxSimilarity) {
+                            maxSimilarity = similarity;
+                            bestTarget = candidate;
+                        }
+                    }
+
+                    if (bestTarget == -1) {
+                        bestTarget = testing_node;
+                    }
+
+                    // Proceed with MoSSo's original update logic using the newly found best target
+                    if (randInt(1, 10) > escape || iteration < 1000) {
+                        // merges testing_node and bestTarget into bestTarget, which is still in the parition
+                        tryNodalUpdate(testing_node, V.getInt(bestTarget));
+                    } else {
+                        // only if the supernode containing nbd is not singleton
+                        if(getSize(V.getInt(testing_node)) > 1) tryNodalUpdate(testing_node, newSupernode());
+                    }
+                }
+            }
+        }
+    }
+
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
@@ -410,14 +486,14 @@ public class MoSSo extends SupernodeHelper {
         int which = randInt(0, n_hash-1);
         if(getDegree(src) > 0){
             IntArrayList srcnbd = getRandomNeighbors(src, sampleNumber);
-            _processEdge(dst, srcnbd, which);
+            _divide_and_merge(dst, srcnbd, which);
         }else{
             // since node src is an isolated node
             deactivateNode(src);
         }
         if(getDegree(dst) > 0){
             IntArrayList dstnbd = getRandomNeighbors(dst, sampleNumber);
-            _processEdge(src, dstnbd, which);
+            _divide_and_merge(src, dstnbd, which);
         }else{
             // since node dst is an isolated node
             deactivateNode(dst);
