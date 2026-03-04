@@ -10,9 +10,6 @@ SUMMARIZED_DIR = os.path.join(BENCHMARK_DIR, "summarized_graphs")
 SWEEP_DIR = os.path.join(OUTPUT_DIR, "parameter_sweep")
 LOG_DIR = os.path.join(OUTPUT_DIR, "logs")
 
-JAR_ORIGINAL = "mosso-original.jar"
-JAR_HYBRID = "mosso-hybrid.jar"
-ORIGINAL_REPO_URL = "https://github.com/jihoonko/kdd20-mosso"
 BASE_REPO_URL = "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git"
 
 PARAM_CONFIG = {

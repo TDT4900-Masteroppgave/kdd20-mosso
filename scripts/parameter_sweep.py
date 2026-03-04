@@ -3,10 +3,8 @@ import pandas as pd
 from tabulate import tabulate
 
 from config import ALGORITHMS, SWEEP_DIR, PARAM_CONFIG
-from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline
-from run_mosso import run_multiple_mosso
+from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple_mosso
 from plotter import plot_parameter_analysis
-
 from benchmark import Benchmark
 
 
