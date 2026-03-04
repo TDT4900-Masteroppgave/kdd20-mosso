@@ -16,7 +16,8 @@ PARAM_CONFIG = {
     "c": {"description":"sample number", "default": 120},
     "e": {"description":"escape", "default": 3},
     "interval": {"description":"interval", "default": 1000},
-    "b": {"description":"top candidates","default": 5}
+    "b": {"description":"top candidates","default": 5},
+    "h": {"description":"top candidates","default": 4}
 }
 
 ALGORITHMS = {
@@ -37,7 +38,7 @@ ALGORITHMS = {
     "strat_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_2",
-        "template": ["e", "c", "interval"]
+        "template": ["e", "c", "interval", "h"]
     },
     "strat_1_2": {
         "repo": BASE_REPO_URL,
