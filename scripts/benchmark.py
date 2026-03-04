@@ -35,6 +35,7 @@ class Benchmark(ABC):
         args.local = False
 
         if args.algos:
+            if "local" in args.algos: args.local = True
             self.active_algos = {k: v for k, v in ALGORITHMS.items() if k in args.algos}
         else:
             self.active_algos = {k: v for k, v in ALGORITHMS.items() if k != "local"}
@@ -74,7 +75,7 @@ class Benchmark(ABC):
         """Logic for setting up the benchmark environment."""
         self.datasets_to_run = get_datasets_to_run(self.args)
         setup_directories()
-        build_jars(self.args.local, self.logger)
+        build_jars(self.args.local, self.logger, self.active_algos.items())
 
     def get_algo_param_display(self, p_key, default_val):
         """Hook method. Allows subclasses to override parameter display formatting."""
@@ -90,7 +91,7 @@ class Benchmark(ABC):
             if arg_key not in PARAM_CONFIG:
                 self.logger.info(" "*4 + f"- {arg_key}: {arg_val}")
 
-        for algo_name, algo_config in ALGORITHMS.items():
+        for algo_name, algo_config in self.active_algos.items():
             self.logger.info(f"[*] Hyperparameters for {algo_name}: ")
             template = algo_config.get('template', [])
             params = algo_config.get('params', {})

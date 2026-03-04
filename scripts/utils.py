@@ -23,7 +23,7 @@ def setup_directories():
         os.makedirs(d, exist_ok=True)
 
 
-def build_jars(is_local, logger):
+def build_jars(is_local, logger, algorithms):
     fastutil = get_fastutil_path()
     if not os.path.exists(fastutil):
         logger.error(f"[!] Error: {fastutil} missing. Download it to root first.")
@@ -44,7 +44,7 @@ def build_jars(is_local, logger):
 
     logger.info("[*] Compiling configured algorithms...")
 
-    for algo_name, config in ALGORITHMS.items():
+    for algo_name, config in algorithms:
         if algo_name == "local":
             continue
 
