@@ -35,17 +35,9 @@ class Benchmark(ABC):
         args.local = False
 
         if args.algos:
-            if "local" in args.algos:
-                args.local = True
-            for a in args.algos:
-                if a not in ALGORITHMS.keys():
-                    print(f"[!] Unknown algorithm: {a}. Available options: {list(ALGORITHMS.keys())}")
-                    exit(1)
-            for key in list(ALGORITHMS.keys()):
-                if key not in args.algos:
-                    ALGORITHMS.pop(key, None)
+            self.active_algos = {k: v for k, v in ALGORITHMS.items() if k in args.algos}
         else:
-            ALGORITHMS.pop("local", None)
+            self.active_algos = {k: v for k, v in ALGORITHMS.items() if k != "local"}
 
         if args.baseline and args.baseline not in ALGORITHMS:
             print(f"[!] The specified baseline '{args.baseline}' is not in the active algorithms list.")

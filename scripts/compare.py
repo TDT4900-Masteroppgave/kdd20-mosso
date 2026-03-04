@@ -35,7 +35,7 @@ class CompareBenchmark(Benchmark):
             current_result = {"Dataset": dataset_name}
             all_times_dict, all_ratios_dict = {}, {}
 
-            for algo_name, algo_config in ALGORITHMS.items():
+            for algo_name, algo_config in self.active_algos.items():
                 jar_file = f"mosso-{algo_name}.jar"
                 if not os.path.exists(jar_file):
                     continue

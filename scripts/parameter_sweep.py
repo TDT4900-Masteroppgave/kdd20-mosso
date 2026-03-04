@@ -50,7 +50,7 @@ class ParameterSweepBenchmark(Benchmark):
                 logger.info(f"[{i}/{len(datasets_to_run)}] Running {dataset_name} ({args.runs} runs) ...")
                 current_result = {"Dataset": dataset_name, param: val}
 
-                for algo_name, algo_config in ALGORITHMS.items():
+                for algo_name, algo_config in self.active_algos.items():
                     jar_file = f"mosso-{algo_name}.jar"
                     if not os.path.exists(jar_file): continue
 
