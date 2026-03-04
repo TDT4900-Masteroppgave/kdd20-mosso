@@ -49,12 +49,12 @@ def build_jars(is_local, logger):
         if algo_name == "local":
             continue
 
-        repo_url = config['repo']
-        branch = config['branch']
+        repo_url = str(config['repo'])
+        branch = str(config['branch'])
         jar_name = f"mosso-{algo_name}.jar"
-        target_dir = os.path.join(VERSIONS_DIR, algo_name)
+        target_dir = str(os.path.join(VERSIONS_DIR, algo_name))
 
-        logger.debug(f"   -> Building {algo_name} (Repo: {repo_url.split('/')[-1]} | Branch: {branch})...")
+        logger.debug(f"\t-> Building {algo_name} (Repo: {repo_url.split('/')[-1]} | Branch: {branch})...")
 
         try:
             if not os.path.exists(target_dir):
