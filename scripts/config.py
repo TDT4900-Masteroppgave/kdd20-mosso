@@ -13,11 +13,11 @@ LOG_DIR = os.path.join(OUTPUT_DIR, "logs")
 BASE_REPO_URL = "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git"
 
 PARAM_CONFIG = {
-    "c": {"description":"sample number", "default": 120},
-    "e": {"description":"escape", "default": 3},
-    "interval": {"description":"interval", "default": 1000},
-    "b": {"description":"top candidates","default": 5},
-    "h": {"description":"top candidates","default": 4}
+    "c": {"description": "sample number", "default": 120, "bounds": (10, 240)},
+    "e": {"description": "escape", "default": 3, "bounds": (1, 9)},
+    "interval": {"description": "interval", "default": 1000, "bounds": (1000, 1000)},
+    "b": {"description": "top candidates", "default": 5, "bounds": (1, 10)},
+    "h": {"description": "hashes", "default": 4, "bounds": (4, 40)}
 }
 
 ALGORITHMS = {

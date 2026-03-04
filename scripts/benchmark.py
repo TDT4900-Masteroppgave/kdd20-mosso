@@ -109,6 +109,10 @@ class Benchmark(ABC):
                     display_val = self.get_algo_param_display(p_key, base_val)
                     self.logger.info(" "*4 + f"- {p_key}: {display_val}")
 
+        self.logger.info("[*] Datasets to Run:")
+        for url, filename in self.datasets_to_run:
+            self.logger.info(f" "*4 + f"- {filename}")
+
         self.logger.info("=" * 10 + f"{' STAGE 2: PROCESSING ':^30}" + "=" * 10)
         self.process()
 
