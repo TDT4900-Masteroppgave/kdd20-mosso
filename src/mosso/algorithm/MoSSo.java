@@ -347,16 +347,56 @@ public class MoSSo extends SupernodeHelper {
         return (double) matches / n_hash;
     }
 
+
+    
+    // Helper to combine two ints into a long key (deterministic)
+    private long mixToLong(int a, int b) {
+        return (((long) a) << 64) ^ (b & 0xffffffffL);
+    }
+
+    // Overload with extra salt (e.g., level or node id)
+    private long mixToLong(int a, int b, int salt) {
+        long x = mixToLong(a, b);
+        return x ^ (0x9E3779B97F4A7C15L * salt); // golden ratio salt
+    }
+
     private void _divide_and_merge(final int dst, IntArrayList srcnbd, final int which) {
+        int CAP = 32;
         // divide noed into paritions using min hash e.g. coarse clustering
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         if(getDegree(dst) > 0) srcnbd.set(0, dst);
         // coarse clustering using minhash
+        
+         // --- Coarse clustering using minhash with a bucket size cap ---
         for (int v : srcnbd) {
-            long target = minHash[which].getInt(v);
-            if (!srcGrp.containsKey(target)) srcGrp.put(target, new IntArrayList());
-            srcGrp.get(target).add(v);
+            int base = minHash[0].getInt(v);   // primary hash
+            long key = base;
+            int level = 0;
+
+            while (true) {
+                IntArrayList part = srcGrp.get(key);
+                if (part == null) {
+                    part = new IntArrayList();
+                    srcGrp.put(key, part);
+                }
+                if (part.size() < CAP) {
+                    part.add(v);
+                    break;
+                }
+
+                // bucket full -> refine key using additional minhashes or a deterministic salt
+                level++;
+                if (level < minHash.length) {
+                    int refine = minHash[level].getInt(v);
+                    key = mixToLong(base, refine);
+                } else {
+                    // Out of minhash functions; deterministically salt to create more buckets
+                    // Using 'v' ensures the same node is placed consistently across runs
+                    key = mixToLong(base, level, v);
+                }
+            }
         }
+
 
         // for each partition
         for (IntArrayList partition : srcGrp.values()) {
