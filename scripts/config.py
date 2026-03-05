@@ -42,7 +42,7 @@ ALGORITHMS = {
     },
     "dividing_strategy": {
         "repo": BASE_REPO_URL,
-        "branch": "feature/dividing_strategy",
+        "branch": "feature/dividing-strategy",
         "template": ["escape", "samples", "interval"]
     },
 }
