@@ -20,8 +20,9 @@ public class MoSSo extends SupernodeHelper {
     private long costCounter = 0;
     private int ecnt = 0;
     private int interval;
+    private int CAP;
 
-    public MoSSo(boolean directed, final int _escape, final int _sample, final int _interval){
+    public MoSSo(boolean directed, final int _escape, final int _sample, final int _interval, final int _CAP){
         super(directed);
         if(directed){
             try {
@@ -35,6 +36,7 @@ public class MoSSo extends SupernodeHelper {
         n_hash = 4;
         sampleNumber = _sample;
         interval = _interval;
+        CAP = _CAP;
         start = System.currentTimeMillis();
         hash_initialization();
     }
@@ -355,7 +357,6 @@ public class MoSSo extends SupernodeHelper {
     }
 
     private void _divide_and_merge(final int dst, IntArrayList srcnbd, final int which) {
-        int CAP = 64;
         // divide noed into paritions using min hash e.g. coarse clustering
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         if(getDegree(dst) > 0) srcnbd.set(0, dst);
