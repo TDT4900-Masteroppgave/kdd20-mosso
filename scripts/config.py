@@ -40,9 +40,9 @@ ALGORITHMS = {
         "branch": "feature/merging_strategy_1_2",
         "template": ["escape", "samples", "interval", "b"]
     },
-    "dividing_strategy": {
+    "divide_strategy": {
         "repo": BASE_REPO_URL,
-        "branch": "feature/dividing_strategy",
+        "branch": "feature/divide_strategy",
         "template": ["escape", "samples", "interval"]
     },
 }
