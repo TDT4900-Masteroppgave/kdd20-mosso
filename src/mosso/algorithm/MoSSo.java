@@ -351,17 +351,11 @@ public class MoSSo extends SupernodeHelper {
     
     // Helper to combine two ints into a long key (deterministic)
     private long mixToLong(int a, int b) {
-        return (((long) a) << 64) ^ (b & 0xffffffffL);
-    }
-
-    // Overload with extra salt (e.g., level or node id)
-    private long mixToLong(int a, int b, int salt) {
-        long x = mixToLong(a, b);
-        return x ^ (0x9E3779B97F4A7C15L * salt); // golden ratio salt
+        return (((long) a) << 32) ^ (b & 0xffffffffL);
     }
 
     private void _divide_and_merge(final int dst, IntArrayList srcnbd, final int which) {
-        int CAP = 32;
+        int CAP = 64;
         // divide noed into paritions using min hash e.g. coarse clustering
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         if(getDegree(dst) > 0) srcnbd.set(0, dst);
@@ -384,16 +378,24 @@ public class MoSSo extends SupernodeHelper {
                     break;
                 }
 
-                // bucket full -> refine key using additional minhashes or a deterministic salt
-                level++;
-                if (level < minHash.length) {
-                    int refine = minHash[level].getInt(v);
-                    key = mixToLong(base, refine);
+                
+                boolean atLastLevel = (level >= minHash.length - 1);
+
+                if (atLastLevel) {
+                    // Collector bucket: absorb the rest, even beyond CAP
+                    part.add(v);
+                    break;
                 } else {
-                    // Out of minhash functions; deterministically salt to create more buckets
-                    // Using 'v' ensures the same node is placed consistently across runs
-                    key = mixToLong(base, level, v);
+                if (part.size() < CAP) {
+                    part.add(v);
+                    break;
                 }
+                // bucket is full and we still have more minhashes -> refine
+                level++;
+                int refine = minHash[level].getInt(v);
+                key = mixToLong(base, refine);
+            }
+
             }
         }
 
