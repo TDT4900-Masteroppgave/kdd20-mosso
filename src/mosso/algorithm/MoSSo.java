@@ -361,7 +361,7 @@ public class MoSSo extends SupernodeHelper {
     }
 
     private void _divide_and_merge(final int dst, IntArrayList srcnbd, final int which) {
-        int CAP = 32;
+        int CAP = 64;
         // divide noed into paritions using min hash e.g. coarse clustering
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         if(getDegree(dst) > 0) srcnbd.set(0, dst);
