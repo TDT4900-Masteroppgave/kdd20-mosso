@@ -361,11 +361,13 @@ public class MoSSo extends SupernodeHelper {
         // for each partition
         for (IntArrayList partition : srcGrp.values()) {
             // while partiotion is not empty (contains nodes to merge)
-            while (!partition.isEmpty()) {
+            IntIterator it = partition.iterator();
+            while (it.hasNext()) {
                 // picks (and remove) a random node from the partition
-                int rand_index = randInt(0, partition.size()-1);
-                int testing_node = partition.getInt(rand_index);
-                partition.removeInt(rand_index);
+                // int rand_index = randInt(0, partition.size()-1);
+                // int testing_node = partition.getInt(rand_index);
+                // partition.removeInt(rand_index);
+                int testing_node = it.nextInt();
 
                 if (randInt(1, getDegree(testing_node)) <= 1) {
                 
