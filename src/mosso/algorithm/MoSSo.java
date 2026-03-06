@@ -22,8 +22,9 @@ public class MoSSo extends SupernodeHelper {
     private long costCounter = 0;
     private int ecnt = 0;
     private int interval;
+    private int CAP;
 
-    public MoSSo(boolean directed, final int _escape, final int _sample, final int _interval){
+    public MoSSo(boolean directed, final int _escape, final int _sample, final int _interval, final int _CAP){
         super(directed);
         if(directed){
             try {
@@ -37,6 +38,7 @@ public class MoSSo extends SupernodeHelper {
         n_hash = 4;
         sampleNumber = _sample;
         interval = _interval;
+        CAP = _CAP;
         start = System.currentTimeMillis();
         hash_initialization();
     }
@@ -355,7 +357,6 @@ public class MoSSo extends SupernodeHelper {
     }
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
-        int CAP = 45;
         // divide noed into paritions using min hash e.g. coarse clustering
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         // Map: node id -> final bucket key used during coarse clustering
@@ -378,7 +379,6 @@ public class MoSSo extends SupernodeHelper {
             // Base: use the given randomly chosen 'which'
             int baseHash = minHash[which].getInt(v);
             long key = baseHash;
-            int refinements = 0; // how many times we’ve refined
 
             while (true) {
                 IntArrayList part = srcGrp.get(key);
@@ -402,10 +402,6 @@ public class MoSSo extends SupernodeHelper {
                     nodeToBucketKey.put(v, key);
                     break;
                 }
-
-                
-                // Bucket is full -> randomly choose a next refiner (true randomness, no reuse)
-                refinements++;
 
                 // Draw a random index from remaining[0..rc-1]
                 int rand_index = randInt(0, num_remaining_minhash-1);
