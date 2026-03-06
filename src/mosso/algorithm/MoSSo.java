@@ -357,16 +357,28 @@ public class MoSSo extends SupernodeHelper {
     }
 
     private void _divide_and_merge(final int dst, IntArrayList srcnbd, final int which) {
-        // divide noed into paritions using min hash e.g. coarse clustering
+         // divide noed into paritions using min hash e.g. coarse clustering
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
+        // Map: node id -> final bucket key used during coarse clustering
+        Int2LongOpenHashMap nodeToBucketKey = new Int2LongOpenHashMap();
         if(getDegree(dst) > 0) srcnbd.set(0, dst);
         // coarse clustering using minhash
+
+        final int num_minHash = minHash.length;
         
          // --- Coarse clustering using minhash with a bucket size cap ---
         for (int v : srcnbd) {
-            int base = minHash[0].getInt(v);   // primary hash
-            long key = base;
-            int level = 0;
+
+            // Initialization: build remaining index pool excluding the base 'which'
+            int[] remaining_minhash_indexes = new int[num_minHash - 1];
+            int num_remaining_minhash = 0;
+            for (int i = 0; i < num_minHash; i++) {
+                if (i != which) remaining_minhash_indexes[num_remaining_minhash++] = i;
+            }
+            
+            // Base: use the given randomly chosen 'which'
+            int baseHash = minHash[which].getInt(v);
+            long key = baseHash;
 
             while (true) {
                 IntArrayList part = srcGrp.get(key);
@@ -374,28 +386,37 @@ public class MoSSo extends SupernodeHelper {
                     part = new IntArrayList();
                     srcGrp.put(key, part);
                 }
+        
+                // If no more minhash indices remain to refine with -> collector
+                boolean noMoreRefiners = (num_remaining_minhash == 0);
+
+                if (noMoreRefiners) {
+                    // Collector bucket: absorb regardless of CAP
+                    part.add(v);
+                    nodeToBucketKey.put(v, key);
+                    break;
+                }
+
                 if (part.size() < CAP) {
                     part.add(v);
+                    nodeToBucketKey.put(v, key);
                     break;
                 }
 
+                // Draw a random index from remaining[0..rc-1]
+                int rand_index = randInt(0, num_remaining_minhash-1);
                 
-                boolean atLastLevel = (level >= minHash.length - 1);
+                // swap-pop to remove remaining[rand_index] from the pool
+                num_remaining_minhash--;
+                int selected_minhash_index = remaining_minhash_indexes[rand_index];
+                remaining_minhash_indexes[rand_index] = remaining_minhash_indexes[num_remaining_minhash];
+                // places the used minHash at the back
+                remaining_minhash_indexes[num_remaining_minhash] = selected_minhash_index;
 
-                if (atLastLevel) {
-                    // Collector bucket: absorb the rest, even beyond CAP
-                    part.add(v);
-                    break;
-                } else {
-                    if (part.size() < CAP) {
-                        part.add(v);
-                        break;
-                    }
-                    // bucket is full and we still have more minhashes -> refine
-                    level++;
-                    int refine = minHash[level].getInt(v);
-                    key = mixToLong(base, refine);
-                }
+                // Refine the key with the newly chosen minhash
+                int refineHash = minHash[selected_minhash_index].getInt(v);
+
+                key = mixToLong(baseHash, refineHash);
             }
         }
 
