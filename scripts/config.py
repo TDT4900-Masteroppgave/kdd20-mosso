@@ -17,7 +17,7 @@ BASE_REPO_URL = "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git"
 
 ALGORITHMS = {
     "local": {
-        "template": ["escape", "samples", "interval", "b"]
+        "template": ["escape", "samples", "interval", "cap"]
     },
     "kdd20-mosso": {
         "repo": "https://github.com/jihoonko/kdd20-mosso.git",

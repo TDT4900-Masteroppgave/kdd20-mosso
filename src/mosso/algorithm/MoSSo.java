@@ -387,16 +387,15 @@ public class MoSSo extends SupernodeHelper {
                     part.add(v);
                     break;
                 } else {
-                if (part.size() < CAP) {
-                    part.add(v);
-                    break;
+                    if (part.size() < CAP) {
+                        part.add(v);
+                        break;
+                    }
+                    // bucket is full and we still have more minhashes -> refine
+                    level++;
+                    int refine = minHash[level].getInt(v);
+                    key = mixToLong(base, refine);
                 }
-                // bucket is full and we still have more minhashes -> refine
-                level++;
-                int refine = minHash[level].getInt(v);
-                key = mixToLong(base, refine);
-            }
-
             }
         }
 
