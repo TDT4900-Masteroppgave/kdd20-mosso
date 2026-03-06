@@ -6,6 +6,8 @@ import jdk.jshell.spi.ExecutionControl;
 import mosso.SupernodeHelper;
 import static java.lang.Long.min;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 public class MoSSo extends SupernodeHelper {
     private final int INF = 0x7FFFFFFF;
     private int iteration = 0;
@@ -353,19 +355,30 @@ public class MoSSo extends SupernodeHelper {
     }
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
-        int CAP = 10;
+        int CAP = 45;
         // divide noed into paritions using min hash e.g. coarse clustering
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         // Map: node id -> final bucket key used during coarse clustering
         Int2LongOpenHashMap nodeToBucketKey = new Int2LongOpenHashMap();
         if(getDegree(dst) > 0) srcnbd.set(0, dst);
         // coarse clustering using minhash
+
+        final int num_minHash = minHash.length;
         
          // --- Coarse clustering using minhash with a bucket size cap ---
         for (int v : srcnbd) {
-            int base = minHash[0].getInt(v);   // primary hash
-            long key = base;
-            int level = 0;
+
+            // Initialization: build remaining index pool excluding the base 'which'
+            int[] remaining_minhash_indexes = new int[num_minHash - 1];
+            int num_remaining_minhash = 0;
+            for (int i = 0; i < num_minHash; i++) {
+                if (i != which) remaining_minhash_indexes[num_remaining_minhash++] = i;
+            }
+            
+            // Base: use the given randomly chosen 'which'
+            int baseHash = minHash[which].getInt(v);
+            long key = baseHash;
+            int refinements = 0; // how many times we’ve refined
 
             while (true) {
                 IntArrayList part = srcGrp.get(key);
@@ -374,14 +387,15 @@ public class MoSSo extends SupernodeHelper {
                     srcGrp.put(key, part);
                 }
         
-                boolean atLastLevel = (level >= minHash.length - 1);
+                // If no more minhash indices remain to refine with -> collector
+                boolean noMoreRefiners = (num_remaining_minhash == 0);
 
-                if (atLastLevel) {
-                    // Collector bucket: absorb the rest, even beyond CAP
+                if (noMoreRefiners) {
+                    // Collector bucket: absorb regardless of CAP
                     part.add(v);
                     nodeToBucketKey.put(v, key);
                     break;
-                } 
+                }
 
                 if (part.size() < CAP) {
                     part.add(v);
@@ -389,10 +403,24 @@ public class MoSSo extends SupernodeHelper {
                     break;
                 }
 
-                // bucket is full and we still have more minhashes -> refine
-                level++;
-                int refine = minHash[level].getInt(v);
-                key = mixToLong(base, refine);
+                
+                // Bucket is full -> randomly choose a next refiner (true randomness, no reuse)
+                refinements++;
+
+                // Draw a random index from remaining[0..rc-1]
+                int rand_index = randInt(0, num_remaining_minhash-1);
+                
+                // swap-pop to remove remaining[rand_index] from the pool
+                num_remaining_minhash--;
+                int selected_minhash_index = remaining_minhash_indexes[rand_index];
+                remaining_minhash_indexes[rand_index] = remaining_minhash_indexes[num_remaining_minhash];
+                // places the used minHash at the back
+                remaining_minhash_indexes[num_remaining_minhash] = selected_minhash_index;
+
+                // Refine the key with the newly chosen minhash
+                int refineHash = minHash[selected_minhash_index].getInt(v);
+
+                key = mixToLong(baseHash, refineHash);
             }
         }
 
@@ -401,12 +429,14 @@ public class MoSSo extends SupernodeHelper {
             if (randInt(1, getDegree(nbd)) <= 1) {                
                 // Get the actual bucket this node was assigned to during partitioning
                 long key = nodeToBucketKey.get(nbd);
+                IntArrayList candidatePool = srcGrp.get(key);
+
+                if (candidatePool == null || candidatePool.isEmpty()) continue;
 
                 // MAGS-DM: Similarity Measure
                 int bestTarget = -1;
                 double maxSimilarity = -1.0;
 
-                IntArrayList candidatePool = srcGrp.get(key);
                 for (int candidate: candidatePool) {
                     if (candidate == nbd) continue;
 
