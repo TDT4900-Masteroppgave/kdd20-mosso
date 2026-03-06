@@ -352,8 +352,33 @@ public class MoSSo extends SupernodeHelper {
 
     
     // Helper to combine two ints into a long key (deterministic)
-    private long mixToLong(int a, int b) {
+    private long _mixToLong(int a, int b) {
         return (((long) a) << 32) ^ (b & 0xffffffffL);
+    }
+
+    private int[] _getMinHashOrder(final int which) {
+        // Build random order once, outside the v-loop
+        int[] minhash_index_order = new int[minHash.length];
+
+        // 0) which is chosen already (true random), make it the first
+        minhash_index_order[0] = which;
+
+        // 1) Fill the tail with all other indices
+        int t = 1;
+        for (int i = 0; i < minHash.length; i++) {
+            if (i == which) continue;
+            minhash_index_order[t++] = i;
+        }
+
+        // 2) Shuffle the tail [1 .. minHash.length-1] with Fisher–Yates (true randomness each run)
+        for (int i = minHash.length - 1; i > 1; i--) {
+            int j = randInt(1, i); // random in [1..i]
+            int tmp = minhash_index_order[i];
+            minhash_index_order[i] = minhash_index_order[j];
+            minhash_index_order[j] = tmp;
+        }
+
+        return minhash_index_order;
     }
 
     private void _divide_and_merge(final int dst, IntArrayList srcnbd, final int which) {
@@ -364,19 +389,11 @@ public class MoSSo extends SupernodeHelper {
         if(getDegree(dst) > 0) srcnbd.set(0, dst);
         // coarse clustering using minhash
 
-        final int num_minHash = minHash.length;
+        int[] minhash_index_order = _getMinHashOrder(which);
         
          // --- Coarse clustering using minhash with a bucket size cap ---
         for (int v : srcnbd) {
-
-            // Initialization: build remaining index pool excluding the base 'which'
-            int[] remaining_minhash_indexes = new int[num_minHash - 1];
-            int num_remaining_minhash = 0;
-            for (int i = 0; i < num_minHash; i++) {
-                if (i != which) remaining_minhash_indexes[num_remaining_minhash++] = i;
-            }
-            
-            // Base: use the given randomly chosen 'which'
+            int level = 0;
             int baseHash = minHash[which].getInt(v);
             long key = baseHash;
 
@@ -388,9 +405,9 @@ public class MoSSo extends SupernodeHelper {
                 }
         
                 // If no more minhash indices remain to refine with -> collector
-                boolean noMoreRefiners = (num_remaining_minhash == 0);
+                boolean atLastLevel = (level >= minHash.length - 1);
 
-                if (noMoreRefiners) {
+                if (atLastLevel) {
                     // Collector bucket: absorb regardless of CAP
                     part.add(v);
                     nodeToBucketKey.put(v, key);
@@ -403,20 +420,12 @@ public class MoSSo extends SupernodeHelper {
                     break;
                 }
 
-                // Draw a random index from remaining[0..rc-1]
-                int rand_index = randInt(0, num_remaining_minhash-1);
-                
-                // swap-pop to remove remaining[rand_index] from the pool
-                num_remaining_minhash--;
-                int selected_minhash_index = remaining_minhash_indexes[rand_index];
-                remaining_minhash_indexes[rand_index] = remaining_minhash_indexes[num_remaining_minhash];
-                // places the used minHash at the back
-                remaining_minhash_indexes[num_remaining_minhash] = selected_minhash_index;
-
                 // Refine the key with the newly chosen minhash
+                level++;
+                int selected_minhash_index = minhash_index_order[level];
                 int refineHash = minHash[selected_minhash_index].getInt(v);
 
-                key = mixToLong(baseHash, refineHash);
+                key = _mixToLong(baseHash, refineHash);
             }
         }
 
