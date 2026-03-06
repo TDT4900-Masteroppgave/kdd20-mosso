@@ -347,27 +347,66 @@ public class MoSSo extends SupernodeHelper {
         return (double) matches / n_hash;
     }
 
-    private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
-        Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
-        if(getDegree(dst) > 0) srcnbd.set(0, dst);
+    // Helper to combine two ints into a long key (deterministic)
+    private long mixToLong(int a, int b) {
+        return (((long) a) << 32) ^ (b & 0xffffffffL);
+    }
 
+    private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
+        int CAP = 10;
+        // divide noed into paritions using min hash e.g. coarse clustering
+        Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
+        // Map: node id -> final bucket key used during coarse clustering
+        Int2LongOpenHashMap nodeToBucketKey = new Int2LongOpenHashMap();
+        if(getDegree(dst) > 0) srcnbd.set(0, dst);
         // coarse clustering using minhash
+        
+         // --- Coarse clustering using minhash with a bucket size cap ---
         for (int v : srcnbd) {
-            long target = minHash[which].getInt(v);
-            if (!srcGrp.containsKey(target)) srcGrp.put(target, new IntArrayList());
-            srcGrp.get(target).add(v);
+            int base = minHash[0].getInt(v);   // primary hash
+            long key = base;
+            int level = 0;
+
+            while (true) {
+                IntArrayList part = srcGrp.get(key);
+                if (part == null) {
+                    part = new IntArrayList();
+                    srcGrp.put(key, part);
+                }
+        
+                boolean atLastLevel = (level >= minHash.length - 1);
+
+                if (atLastLevel) {
+                    // Collector bucket: absorb the rest, even beyond CAP
+                    part.add(v);
+                    nodeToBucketKey.put(v, key);
+                    break;
+                } 
+
+                if (part.size() < CAP) {
+                    part.add(v);
+                    nodeToBucketKey.put(v, key);
+                    break;
+                }
+
+                // bucket is full and we still have more minhashes -> refine
+                level++;
+                int refine = minHash[level].getInt(v);
+                key = mixToLong(base, refine);
+            }
         }
 
         for (int i = 0; i < sampleNumber; i++) {
             int nbd = srcnbd.getInt(i);
-            if (randInt(1, getDegree(nbd)) <= 1) {
-                long mh = minHash[which].getInt(nbd);
+            if (randInt(1, getDegree(nbd)) <= 1) {                
+                // Get the actual bucket this node was assigned to during partitioning
+                long key = nodeToBucketKey.get(nbd);
 
                 // MAGS-DM: Similarity Measure
                 int bestTarget = -1;
                 double maxSimilarity = -1.0;
 
-                IntArrayList candidatePool = srcGrp.get(mh);
+                IntArrayList candidatePool = srcGrp.get(key);
                 for (int candidate: candidatePool) {
                     if (candidate == nbd) continue;
 
