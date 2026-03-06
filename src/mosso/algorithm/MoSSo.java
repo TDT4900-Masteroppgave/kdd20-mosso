@@ -352,20 +352,11 @@ public class MoSSo extends SupernodeHelper {
     }
 
     // Helper to combine two ints into a long key (deterministic)
-    private long mixToLong(int a, int b) {
+    private long _mixToLong(int a, int b) {
         return (((long) a) << 32) ^ (b & 0xffffffffL);
     }
 
-    private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
-        // divide noed into paritions using min hash e.g. coarse clustering
-        Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
-        // Map: node id -> final bucket key used during coarse clustering
-        Int2LongOpenHashMap nodeToBucketKey = new Int2LongOpenHashMap();
-        if(getDegree(dst) > 0) srcnbd.set(0, dst);
-        // coarse clustering using minhash
-
-        // TODO: optimalization idea - it is not possible to define the minhash ordering outside the coarse clustering?
-        
+    private int[] _getMinHashOrder(final int which) {
         // Build random order once, outside the v-loop
         int[] minhash_index_order = new int[minHash.length];
 
@@ -386,6 +377,20 @@ public class MoSSo extends SupernodeHelper {
             minhash_index_order[i] = minhash_index_order[j];
             minhash_index_order[j] = tmp;
         }
+
+        return minhash_index_order;
+    }
+
+    private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
+        // divide noed into paritions using min hash e.g. coarse clustering
+        Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
+        // Map: node id -> final bucket key used during coarse clustering
+        Int2LongOpenHashMap nodeToBucketKey = new Int2LongOpenHashMap();
+        if(getDegree(dst) > 0) srcnbd.set(0, dst);
+        // coarse clustering using minhash
+
+        // Build random order once, outside the v-loop
+        int[] minhash_index_order = _getMinHashOrder(which);
 
          // --- Coarse clustering using minhash with a bucket size cap ---
         for (int v : srcnbd) {
@@ -422,7 +427,7 @@ public class MoSSo extends SupernodeHelper {
                 int selected_minhash_index = minhash_index_order[level];
                 int refineHash = minHash[selected_minhash_index].getInt(v);
 
-                key = mixToLong(baseHash, refineHash);
+                key = _mixToLong(baseHash, refineHash);
             }
         }
 
