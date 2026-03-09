@@ -330,60 +330,60 @@ public class MoSSo extends SupernodeHelper {
      * MAGS-DM: Calculate estimated Jaccard similarity between two nodes
      * by comparing their multiple MinHash signatures.
      */
-    // private double calculateMH(int u, int v, double currentBestSim) {
-    //     int matches = 0;
-    //     int valid = 0; // number of positions where both u and v have a non-INF value
-    //     for (int i = 0; i < n_hash; i++) {
-    //         int hu = minHash[i].getInt(u);
-    //         int hv = minHash[i].getInt(v);
-
-    //         if (hu == INF || hv == INF) {
-    //             continue;
-    //         } else {
-    //             valid++;
-    //             if (hu == hv) matches++;
-    //         }
-
-    //         // OPTIMIZATION: Short-circuit
-    //         // If the remaining hashes can't possibly result in a better score, stop.
-            
-    //         int remaining = n_hash - (i + 1);
-    //         int maxPossibleMatches = matches + remaining;
-    //         int maxPossibleValid   = valid   + remaining;
-
-    //         double bestCaseSim = (maxPossibleValid == 0)
-    //                 ? 1.0                      // no evidence at all -> don't prune just for that
-    //                 : (double) maxPossibleMatches / (double) maxPossibleValid;
-
-    //         if (bestCaseSim < currentBestSim) return -1.0;
-
-    //     }
-
-    //     if (valid == 0) {
-    //         // No evidence to compare u and v
-    //         return -1.0;
-    //     }
-
-    //     return (double) matches / (double) valid;
-
-    // }
-
     private double calculateMH(int u, int v, double currentBestSim) {
         int matches = 0;
+        int valid = 0; // number of positions where both u and v have a non-INF value
         for (int i = 0; i < n_hash; i++) {
-            if (minHash[i].getInt(u) == minHash[i].getInt(v)) {
-                matches++;
+            int hu = minHash[i].getInt(u);
+            int hv = minHash[i].getInt(v);
+
+            if (hu == INF || hv == INF) {
+                continue;
+            } else {
+                valid++;
+                if (hu == hv) matches++;
             }
 
             // OPTIMIZATION: Short-circuit
             // If the remaining hashes can't possibly result in a better score, stop.
+            
             int remaining = n_hash - (i + 1);
-            if (((double) matches + remaining) / n_hash < currentBestSim) {
-                return -1.0; // Fail early
-            }
+            int maxPossibleMatches = matches + remaining;
+            int maxPossibleValid   = valid   + remaining;
+
+            double bestCaseSim = (maxPossibleValid == 0)
+                    ? 1.0                      // no evidence at all -> don't prune just for that
+                    : (double) maxPossibleMatches / (double) maxPossibleValid;
+
+            if (bestCaseSim < currentBestSim) return -1.0;
+
         }
-        return (double) matches / n_hash;
+
+        if (valid == 0) {
+            // No evidence to compare u and v
+            return -1.0;
+        }
+
+        return (double) matches / (double) valid;
+
     }
+
+    // private double calculateMH(int u, int v, double currentBestSim) {
+    //     int matches = 0;
+    //     for (int i = 0; i < n_hash; i++) {
+    //         if (minHash[i].getInt(u) == minHash[i].getInt(v)) {
+    //             matches++;
+    //         }
+
+    //         // OPTIMIZATION: Short-circuit
+    //         // If the remaining hashes can't possibly result in a better score, stop.
+    //         int remaining = n_hash - (i + 1);
+    //         if (((double) matches + remaining) / n_hash < currentBestSim) {
+    //             return -1.0; // Fail early
+    //         }
+    //     }
+    //     return (double) matches / n_hash;
+    // }
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
@@ -422,7 +422,7 @@ public class MoSSo extends SupernodeHelper {
                 }
 
                 // Proceed with MoSSo's original update logic using the newly found best target
-                if ((randInt(1, 10) > escape || iteration < 1000) && maxSimilarity > 0) {
+                if (randInt(1, 10) > escape || iteration < 1000) {
                     tryNodalUpdate(nbd, V.getInt(bestTarget));
                 } else {
                     // only if the supernode containing nbd is not singleton
