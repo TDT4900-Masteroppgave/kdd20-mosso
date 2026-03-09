@@ -346,11 +346,17 @@ public class MoSSo extends SupernodeHelper {
 
             // OPTIMIZATION: Short-circuit
             // If the remaining hashes can't possibly result in a better score, stop.
+            
             int remaining = n_hash - (i + 1);
+            int maxPossibleMatches = matches + remaining;
+            int maxPossibleValid   = valid   + remaining;
 
-            if (((double) matches + remaining) / n_hash < currentBestSim) {
-                return -1.0; // cannot beat current best; prune early
-            }
+            double bestCaseSim = (maxPossibleValid == 0)
+                    ? 1.0                      // no evidence at all -> don't prune just for that
+                    : (double) maxPossibleMatches / (double) maxPossibleValid;
+
+            if (bestCaseSim < currentBestSim) return -1.0;
+
         }
 
         if (valid == 0) {
