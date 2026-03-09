@@ -99,3 +99,87 @@ def plot_parameter_analysis(csv_file, param_name, plot_file):
     plt.tight_layout()
     plt.savefig(plot_file)
     plt.close()
+
+def get_pareto_front_2d(df, x_col, y_col):
+    """
+    Calculates the Pareto front for two metrics we want to MINIMIZE.
+    O(n log n) efficiency using sorting.
+    """
+    # Sort by Time ascending, then Ratio ascending
+    sorted_df = df.sort_values(by=[x_col, y_col])
+    pareto_front = []
+    min_y = float('inf')
+
+    for _, row in sorted_df.iterrows():
+        if row[y_col] < min_y:
+            pareto_front.append(row)
+            min_y = row[y_col]
+
+    return pd.DataFrame(pareto_front)
+
+def plot_pareto_front(csv_file, plot_file):
+    df = pd.read_csv(filepath_or_buffer=str(csv_file)) # Fixed IDE warning
+    if df.empty: return
+
+    # Identify unique datasets to create subplots
+    datasets = df['Dataset'].unique()
+    n_datasets = len(datasets)
+
+    # Dynamically calculate grid size (2 columns wide)
+    cols = 2 if n_datasets > 1 else 1
+    rows = (n_datasets + 1) // 2
+
+    fig, axes = plt.subplots(rows, cols, figsize=(7 * cols, 6 * rows))
+
+    # Ensure axes is always a flattened array for easy iteration
+    if n_datasets == 1:
+        axes = np.array([axes])
+    axes = axes.flatten()
+
+    # Create a consistent color map for algorithms
+    algorithms = df['Algorithm'].unique()
+    cmap = plt.get_cmap('tab10')
+    colors = {algo: cmap(i / max(1, len(algorithms) - 1)) for i, algo in enumerate(algorithms)}
+
+    for i, dataset in enumerate(datasets):
+        ax = axes[i]
+        ds_df = df[df['Dataset'] == dataset]
+
+        # 1. Scatter plot all LHS samples (The "Cloud")
+        for algo in algorithms:
+            algo_df = ds_df[ds_df['Algorithm'] == algo]
+            if algo_df.empty: continue
+
+            ax.scatter(algo_df['Time'], algo_df['Ratio'],
+                       color=colors[algo], label=algo, alpha=0.4, s=40, edgecolors='none')
+
+        # 2. Calculate and plot the Global Pareto Front
+        pareto_df = get_pareto_front_2d(ds_df, 'Time', 'Ratio')
+
+        if not pareto_df.empty:
+            # Draw the line connecting the optimal points
+            ax.plot(pareto_df['Time'], pareto_df['Ratio'],
+                    color='red', linestyle='--', linewidth=2, label='Global Pareto Front', alpha=0.8)
+
+            # Highlight the Pareto-optimal configurations with distinct stars
+            ax.scatter(pareto_df['Time'], pareto_df['Ratio'],
+                       color='gold', edgecolor='red', zorder=5, s=150, marker='*', label='Optimal Config')
+
+        # 3. Formatting
+        ax.set_title(f"Optimization Landscape: {dataset}", fontsize=13, fontweight='bold')
+        ax.set_xlabel("Execution Time (Seconds) ↓", fontsize=11)
+        ax.set_ylabel("Compression Ratio ↓", fontsize=11)
+        ax.grid(True, linestyle=':', alpha=0.6)
+
+        # Deduplicate the legend
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=10)
+
+    # Clean up any empty subplots (if n_datasets is an odd number)
+    for j in range(len(datasets), len(axes)):
+        fig.delaxes(axes[j])
+
+    plt.tight_layout()
+    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+    plt.close()
