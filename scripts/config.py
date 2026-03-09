@@ -49,7 +49,7 @@ ALGORITHMS = {
     "strat_2_cap": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_2_cap",
-        "template": ["escape", "samples", "interval", "cap"]
+        "template": ["e", "c", "interval", "cap"]
     },
 }
 
