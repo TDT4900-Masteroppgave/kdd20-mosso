@@ -381,7 +381,31 @@ public class MoSSo extends SupernodeHelper {
         return minhash_index_order;
     }
 
+    // --- Add near the other fields ---
+    private final double SIM_START = 1.0;     // initial MinHash/Jaccard threshold
+    private final double SIM_END   = 1.0 / n_hash;    // final threshold (or use 1.0 / n_hash)
+                                            // tune per dataset; see notes below
+
+    // Quantize to multiples of 1/n_hash to match MH resolution.
+    private double _quantizeToMhGrid(double x) {
+        double q = Math.floor(Math.max(0.0, Math.min(1.0, x)) * n_hash + 1e-9) / n_hash;
+        return q;
+    }
+
+    /**
+     * Geometric, monotonically decreasing threshold across iterations, MAGS-style,
+     * but in the SIMILARITY domain (MinHash/Jaccard).
+     * t in [1..T]
+     */
+    private double similarityThreshold(int t, int T) {
+        if (T <= 1) return SIM_END;
+        double ratio = Math.pow(SIM_END / Math.max(1e-9, SIM_START), 1.0 / (T - 1));
+        double raw   = SIM_START * Math.pow(ratio, t - 1);
+        return _quantizeToMhGrid(raw);
+    }
+
     private void _divide_and_merge(final int dst, IntArrayList srcnbd, final int which) {
+        final int T = 5;
          // divide noed into paritions using min hash e.g. coarse clustering
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         // Map: node id -> final bucket key used during coarse clustering
@@ -429,46 +453,48 @@ public class MoSSo extends SupernodeHelper {
             }
         }
 
-
-        // for each partition
-        for (IntArrayList partition : srcGrp.values()) {
-            // while partiotion is not empty (contains nodes to merge)
-            IntIterator it = partition.iterator();
-            while (it.hasNext()) {
-                // picks (and remove) a random node from the partition
-                // int rand_index = randInt(0, partition.size()-1);
-                // int testing_node = partition.getInt(rand_index);
-                // partition.removeInt(rand_index);
-                int testing_node = it.nextInt();
-
-                if (randInt(1, getDegree(testing_node)) <= 1) {
-                
-                    // MAGS-DM: Similarity Measure
-                    int bestTarget = -1;
-                    double maxSimilarity = -1.0;
-
-                    for (int candidate : partition) {
-                        if (candidate == testing_node) continue;
-
-                        double similarity = calculateMH(testing_node, candidate, maxSimilarity);
-
-                        if (similarity > maxSimilarity) {
-                            maxSimilarity = similarity;
-                            bestTarget = candidate;
+        for (int current_iter = 1; current_iter <= T; current_iter++) {
+            // for each partition
+            for (IntArrayList partition : srcGrp.values()) {
+                // while partiotion is not empty (contains nodes to merge)
+                IntIterator it = partition.iterator();
+                while (it.hasNext()) {
+                    // picks (and remove) a random node from the partition
+                    // int rand_index = randInt(0, partition.size()-1);
+                    // int testing_node = partition.getInt(rand_index);
+                    // partition.removeInt(rand_index);
+                    int testing_node = it.nextInt();
+    
+                    if (randInt(1, getDegree(testing_node)) <= 1) {
+                    
+                        // MAGS-DM: Similarity Measure
+                        int bestTarget = -1;
+                        double maxSimilarity = -1.0;
+    
+                        for (int candidate : partition) {
+                            if (candidate == testing_node) continue;
+    
+                            double similarity = calculateMH(testing_node, candidate, maxSimilarity);
+    
+                            if (similarity > maxSimilarity) {
+                                maxSimilarity = similarity;
+                                bestTarget = candidate;
+                            }
                         }
-                    }
-
-                    if (bestTarget == -1) {
-                        bestTarget = testing_node;
-                    }
-
-                    // Proceed with MoSSo's original update logic using the newly found best target
-                    if (randInt(1, 10) > escape || iteration < 1000) {
-                        // merges testing_node and bestTarget into bestTarget, which is still in the parition
-                        tryNodalUpdate(testing_node, V.getInt(bestTarget));
-                    } else {
-                        // only if the supernode containing nbd is not singleton
-                        if(getSize(V.getInt(testing_node)) > 1) tryNodalUpdate(testing_node, newSupernode());
+    
+                        double threshold = similarityThreshold(current_iter, T);
+    
+                        if (threshold == SIM_END && bestTarget == -1) {
+                            bestTarget = testing_node;
+                        } else if (maxSimilarity >= threshold) {
+                            // Proceed with MoSSo's original update logic using the newly found best target
+                            if (randInt(1, 10) > escape || iteration < 1000) {
+                                tryNodalUpdate(testing_node, V.getInt(bestTarget));
+                            } else {
+                                // only if the supernode containing nbd is not singleton
+                                if(getSize(V.getInt(testing_node)) > 1) tryNodalUpdate(testing_node, newSupernode());
+                            }
+                        }
                     }
                 }
             }
