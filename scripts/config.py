@@ -40,6 +40,11 @@ ALGORITHMS = {
         "branch": "feature/merging_strategy_1_2",
         "template": ["escape", "samples", "interval", "b"]
     },
+    "strat_2_cap": {
+        "repo": BASE_REPO_URL,
+        "branch": "feature/merging_strategy_2_cap",
+        "template": ["escape", "samples", "interval", "cap"]
+    },
 }
 
 DATASETS = {
