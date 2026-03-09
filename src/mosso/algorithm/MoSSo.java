@@ -422,11 +422,13 @@ public class MoSSo extends SupernodeHelper {
                 }
 
                 // Proceed with MoSSo's original update logic using the newly found best target
-                if ((randInt(1, 10) > escape || iteration < 1000) && maxSimilarity > 0) {
-                    tryNodalUpdate(nbd, V.getInt(bestTarget));
-                } else {
-                    // only if the supernode containing nbd is not singleton
-                    if(getSize(V.getInt(nbd)) > 1) tryNodalUpdate(nbd, newSupernode());
+                if (maxSimilarity > -1) {
+                    if (randInt(1, 10) > escape || iteration < 1000) {
+                        tryNodalUpdate(nbd, V.getInt(bestTarget));
+                    } else {
+                        // only if the supernode containing nbd is not singleton
+                        if(getSize(V.getInt(nbd)) > 1) tryNodalUpdate(nbd, newSupernode());
+                    }
                 }
             }
         }
