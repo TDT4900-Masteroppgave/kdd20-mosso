@@ -10,35 +10,40 @@ SUMMARIZED_DIR = os.path.join(BENCHMARK_DIR, "summarized_graphs")
 SWEEP_DIR = os.path.join(OUTPUT_DIR, "parameter_sweep")
 LOG_DIR = os.path.join(OUTPUT_DIR, "logs")
 
-JAR_ORIGINAL = "mosso-original.jar"
-JAR_HYBRID = "mosso-hybrid.jar"
-ORIGINAL_REPO_URL = "https://github.com/jihoonko/kdd20-mosso"
 BASE_REPO_URL = "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git"
+
+PARAM_CONFIG = {
+    "c": {"description": "sample number", "default": 120, "bounds": (10, 240)},
+    "e": {"description": "escape", "default": 3, "bounds": (1, 9)},
+    "interval": {"description": "interval", "default": 1000, "bounds": (1000, 1000)},
+    "b": {"description": "top candidates", "default": 5, "bounds": (1, 10)},
+    "h": {"description": "hashes", "default": 4, "bounds": (4, 40)}
+}
 
 ALGORITHMS = {
     "local": {
-        "template": ["escape", "samples", "interval", "b"]
+        "template": ["e", "c", "interval"]
     },
     "kdd20-mosso": {
         "repo": "https://github.com/jihoonko/kdd20-mosso.git",
         "branch": "master",
-        "params" : {"samples": 120, "escape": 3},
-        "template": ["escape", "samples", "interval"]
+        "params" : {"c": 120, "e": 3},
+        "template": ["e", "c", "interval"]
     },
     "strat_1": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1",
-        "template": ["escape", "samples", "interval"]
+        "template": ["e", "c", "interval"]
     },
     "strat_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_2",
-        "template": ["escape", "samples", "interval"]
+        "template": ["e", "c", "interval", "h"]
     },
     "strat_1_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1_2",
-        "template": ["escape", "samples", "interval", "b"]
+        "template": ["e", "c", "interval", "b"]
     },
     "strat_2_cap": {
         "repo": BASE_REPO_URL,
@@ -48,6 +53,9 @@ ALGORITHMS = {
 }
 
 DATASETS = {
+    "one": [
+        ("https://snap.stanford.edu/data/as-caida20071105.txt.gz", "as-caida20071105.txt")
+    ],
     "small": [
         ("https://snap.stanford.edu/data/as-caida20071105.txt.gz", "as-caida20071105.txt"),
         ("https://snap.stanford.edu/data/email-Enron.txt.gz", "Email-Enron.txt"),
@@ -62,10 +70,4 @@ DATASETS = {
         ("https://snap.stanford.edu/data/as-skitter.txt.gz", "as-skitter.txt"),
         ("https://snap.stanford.edu/data/bigdata/communities/com-lj.ungraph.txt.gz", "com-lj.ungraph.txt")
     ]
-}
-
-SWEEP_CONFIG = {
-    "samples": {"values": [i for i in range(10, 240, 10)], "default": 120},
-    "escape": {"values": [i for i in range(1, 9, 2)], "default": 3},
-    "b": {"values": [i for i in range(1, 10, 2)], "default": 5}
 }

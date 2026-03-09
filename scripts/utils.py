@@ -1,19 +1,17 @@
 import os
 import shutil
 import subprocess
+import re
 import urllib.request
 import gzip
 import glob
-import argparse
 import pandas as pd
-from tabulate import tabulate
 
 from config import *
 import logging
 import sys
 from datetime import datetime
-from config import LOG_DIR
-
+from config import LOG_DIR, RUNS_DIR, SUMMARIZED_DIR
 
 def get_fastutil_path():
     fastutil_files = glob.glob("fastutil-*.jar")
@@ -25,10 +23,7 @@ def setup_directories():
         os.makedirs(d, exist_ok=True)
 
 
-def build_jars(skip_build, is_local, logger):
-    if skip_build:
-        return
-
+def build_jars(is_local, logger, algorithms):
     fastutil = get_fastutil_path()
     if not os.path.exists(fastutil):
         logger.error(f"[!] Error: {fastutil} missing. Download it to root first.")
@@ -47,18 +42,18 @@ def build_jars(skip_build, is_local, logger):
             logger.error(f"\t[!] Unexpected error building Local code: {e}")
             return
 
-    logger.info("[*] Compiling all configured algorithms...")
+    logger.info("[*] Compiling configured algorithms...")
 
-    for algo_name, config in ALGORITHMS.items():
+    for algo_name, config in algorithms:
         if algo_name == "local":
             continue
 
-        repo_url = config['repo']
-        branch = config['branch']
+        repo_url = str(config['repo'])
+        branch = str(config['branch'])
         jar_name = f"mosso-{algo_name}.jar"
-        target_dir = os.path.join(VERSIONS_DIR, algo_name)
+        target_dir = str(os.path.join(VERSIONS_DIR, algo_name))
 
-        logger.debug(f"   -> Building {algo_name} (Repo: {repo_url.split('/')[-1]} | Branch: {branch})...")
+        logger.debug(f"\t-> Building {algo_name} (Repo: {repo_url.split('/')[-1]} | Branch: {branch})...")
 
         try:
             if not os.path.exists(target_dir):
@@ -72,18 +67,16 @@ def build_jars(skip_build, is_local, logger):
             shutil.copy(fastutil, os.path.join(target_dir, fastutil))
             subprocess.run(["bash", "compile.sh"], cwd=target_dir, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
             shutil.move(os.path.join(target_dir, "mosso-1.0.jar"), jar_name)
-            logger.info(f"      [OK] Successfully built {jar_name}")
+            logger.info(f"\t[OK] Successfully built {jar_name}")
 
         except subprocess.CalledProcessError as e:
-            logger.error(f"      [!] Failed to build {algo_name}. Git/Compile Error: {e.stderr.strip()}")
+            logger.error(f"\t[!] Failed to build {algo_name}. Git/Compile Error: {e.stderr.strip()}")
             if os.path.exists(target_dir):
                 shutil.rmtree(target_dir) # Clean up broken clones
             return
         except Exception as e:
-            logger.error(f"      [!] Unexpected error building {algo_name}: {e}")
+            logger.error(f"\t[!] Unexpected error building {algo_name}: {e}")
             return
-
-    logger.info("[*] All requested Java compilations finished")
 
 
 def prepare_dataset(filepath, logger):
@@ -190,51 +183,8 @@ def setup_logging(run_type):
 
     return logger, timestamp
 
-def parse_and_filter_args(script_type="benchmark"):
-    """CLI parsing and ALGORITHM dictionary filtering."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--file", type=str, help="Specific local graph file.")
-    parser.add_argument("--skip-build", action="store_true")
-    parser.add_argument("--samples", type=int, default=120)
-    parser.add_argument("--escape", type=int, default=3)
-    parser.add_argument("--b", type=int, default=5)
-    parser.add_argument("--interval", type=int, default=1000)
-    parser.add_argument("--runs", type=int, default=1)
-    parser.add_argument("--group", choices=["all"] + list(DATASETS.keys()), default="all")
-    parser.add_argument("--algos", nargs='+', help="Specific algorithms to run (e.g. local baseline strat_1)")
-    parser.add_argument("--keep-summaries", action="store_true")
-    parser.add_argument("--baseline", type=str, help="Algorithm to use as baseline for relative comparisons")
-
-    if script_type == "sweep":
-        parser.add_argument("--param", choices=list(SWEEP_CONFIG.keys()), required=True)
-        parser.add_argument("--range", type=int, nargs=3)
-        parser.add_argument("--values", type=int, nargs='+')
-
-    args = parser.parse_args()
-    args.local = False
-
-    # Filter ALGORITHMS
-    if args.algos:
-        if "local" in args.algos:
-            args.local = True
-        for a in args.algos:
-            if a not in ALGORITHMS.keys():
-                print(f"[!] Unknown algorithm: {a}. Available options: {list(ALGORITHMS.keys())}")
-                exit(1)
-        for key in list(ALGORITHMS.keys()):
-            if key not in args.algos:
-                ALGORITHMS.pop(key, None)
-    else:
-        ALGORITHMS.pop("local", None)
-
-    if args.baseline and args.baseline not in ALGORITHMS:
-        print(f"[!] The specified baseline '{args.baseline}' is not in the active algorithms list.")
-        exit(1)
-
-    return args
-
 def format_dataframe_with_baseline(df, strategies, baseline_algo=None):
-    """Helper function to calculate inline relative % differences."""
+    """Helper function to calculate inline relative performance factors."""
     display_df = df.copy()
 
     for strat in strategies:
@@ -249,17 +199,17 @@ def format_dataframe_with_baseline(df, strategies, baseline_algo=None):
                 t_base = row.get(f"Time_{baseline_algo}")
                 r_base = row.get(f"Ratio_{baseline_algo}")
 
-                # Format Time (Lower is better: -X% is faster)
-                if pd.notna(t_val) and pd.notna(t_base) and t_base > 0:
-                    pct_change = ((t_val - t_base) / t_base) * 100
-                    formatted_times.append(f"{t_val:.3f}s ({pct_change:+.1f}%)")
+                # Format Time (Speedup Factor: > 1.0x is faster, < 1.0x is slower)
+                if pd.notna(t_val) and pd.notna(t_base) and t_val > 0:
+                    speedup = t_base / t_val
+                    formatted_times.append(f"{t_val:.3f}s ({speedup:.2f}x)")
                 else:
                     formatted_times.append(f"{t_val:.3f}s" if pd.notna(t_val) else "N/A")
 
-                # Format Ratio (Lower is better: -X% is more compression)
+                # Format Ratio (Multiplier: < 1.0x is better compression)
                 if pd.notna(r_val) and pd.notna(r_base) and r_base > 0:
-                    pct_change = ((r_val - r_base) / r_base) * 100
-                    formatted_ratios.append(f"{r_val:.5f} ({pct_change:+.2f}%)")
+                    ratio_mult = r_val / r_base
+                    formatted_ratios.append(f"{r_val:.5f} ({ratio_mult:.2f}x)")
                 else:
                     formatted_ratios.append(f"{r_val:.5f}" if pd.notna(r_val) else "N/A")
 
@@ -286,67 +236,61 @@ def get_datasets_to_run(args):
                 datasets_to_run.append((url, filename))
     return datasets_to_run
 
+def run_mosso(jar_file, dataset_path, output_name, discard_summaries, logger, parameters, template):
+    classpath = f"{get_fastutil_path()}{os.pathsep}{jar_file}"
+    out_file = os.path.join(RUNS_DIR, output_name)
+    log_file = f"{out_file}.log"
 
-def print_sweep_table(results, logger, title, sweep_param=None, baseline_algo=None):
-    df = pd.DataFrame(results)
-    strategies = [col.replace("Time_", "") for col in df.columns if col.startswith("Time_")]
+    cmd = ["java", "-cp", classpath, "mosso.Run", dataset_path, output_name, "mosso"]
+    for param_key in template:
+        cmd.append(str(parameters[param_key]))
 
-    display_df = format_dataframe_with_baseline(df, strategies, baseline_algo)
+    logger.debug(f"Running: {' '.join(cmd)}")
+    try:
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        output_lines = []
 
-    # Prettify Headers
-    new_cols = {c: f"{c.replace('Time_', '').capitalize()} Time" if c.startswith("Time_") else f"{c.replace('Ratio_', '').capitalize()} Ratio" if c.startswith("Ratio_") else c.capitalize() for c in display_df.columns}
-    display_df.rename(columns=new_cols, inplace=True)
+        with open(log_file, 'w') as log_f:
+            for line in process.stdout:
+                log_f.write(line)
+                output_lines.append(line)
 
-    table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False)
-    line_width = len(table_str.split('\n')[0])
+        process.wait()
 
-    logger.info("=" * line_width)
-    logger.info(f"{title:^{line_width}}")
-    logger.info("=" * line_width)
+        if process.returncode != 0:
+            logger.error(f"[!] Java error for {output_name}: Code {process.returncode}")
+            full_error = "".join(output_lines)
+            logger.debug(full_error)
+            return None, None
 
-    for line in table_str.split('\n'):
-        logger.info(line)
+        java_output_file = os.path.join("output", output_name)
+        if os.path.exists(java_output_file):
+            if discard_summaries:
+                os.remove(java_output_file)
+            else:
+                shutil.move(java_output_file, os.path.join(SUMMARIZED_DIR, output_name))
 
-    # Average table
-    logger.info("=" * line_width)
-    logger.info(f"{'AVERAGES BY PARAMETER VALUE':^{line_width}}")
-    logger.info("=" * line_width)
+        output = "".join(output_lines)
+        time_m = re.search(r"Execution time:\s*([\d.]+)s", output)
+        ratio_m = re.search(r"Expected Compression Ratio:\s*([\d.]+)", output, re.IGNORECASE)
 
-    avg_df = df.groupby(sweep_param).mean(numeric_only=True).reset_index()
-    avg_df.insert(0, 'Dataset', 'ALL (Avg)')
+        t = float(time_m.group(1)) if time_m else None
+        r = float(ratio_m.group(1)) if ratio_m else None
+        return t, r
 
-    display_avg = format_dataframe_with_baseline(avg_df, strategies, baseline_algo)
+    except Exception as e:
+        logger.error(f"Execution failed for {output_name}: {e}")
+        return None, None
 
-    # Prettify Headers
-    new_cols[sweep_param] = sweep_param.capitalize()
-    display_avg.rename(columns=new_cols, inplace=True)
+def run_multiple_mosso(jar_file, dataset_path, output_name, runs, discard_summaries, logger, parameters, template):
+    times, ratios = [], []
+    for i in range(runs):
+        logger.debug(f"Iter {i+1}/{runs} for {output_name}...")
+        t, r = run_mosso(jar_file, dataset_path, f"{output_name}_run{i+1}", discard_summaries, logger, parameters, template)
+        if t is not None and r is not None:
+            times.append(t)
+            ratios.append(r)
 
-    avg_table_str = tabulate(display_avg, headers='keys', tablefmt='grid', showindex=False)
-
-    for line in avg_table_str.split('\n'):
-        logger.info(line)
-
-def print_benchmark_table(results, logger, title, baseline_algo=None):
-    df = pd.DataFrame(results)
-    strategies = [col.replace("Time_", "") for col in df.columns if col.startswith("Time_")]
-
-    if "Dataset" in df.columns and len(df.columns) > 2 and "Dataset" == df.columns[0]:
-        avg_row = df.mean(numeric_only=True).to_dict()
-        avg_row['Dataset'] = 'AVERAGE'
-        df = pd.concat([df, pd.DataFrame([avg_row])], ignore_index=True)
-
-    display_df = format_dataframe_with_baseline(df, strategies, baseline_algo)
-
-    # Prettify Headers
-    new_cols = {c: f"{c.replace('Time_', '').capitalize()} Time" if c.startswith("Time_") else f"{c.replace('Ratio_', '').capitalize()} Ratio" if c.startswith("Ratio_") else c.capitalize() for c in display_df.columns}
-    display_df.rename(columns=new_cols, inplace=True)
-
-    table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False)
-    line_width = len(table_str.split('\n')[0])
-
-    logger.info("=" * line_width )
-    logger.info(f"{title:^{line_width}}")
-    logger.info("=" * line_width)
-
-    for line in table_str.split('\n'):
-        logger.info(line)
+    t_avg = sum(times) / len(times) if times else None
+    r_avg = sum(ratios) / len(ratios) if ratios else None
+    return t_avg, r_avg, times, ratios
