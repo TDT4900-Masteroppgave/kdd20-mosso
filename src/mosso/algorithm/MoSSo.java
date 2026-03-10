@@ -20,8 +20,9 @@ public class MoSSo extends SupernodeHelper {
     private long costCounter = 0;
     private int ecnt = 0;
     private int interval;
+    private double threshold;
 
-    public MoSSo(boolean directed, final int _escape, final int _sample, final int _interval){
+    public MoSSo(boolean directed, final int _escape, final int _sample, final int _interval, final double _threshold){
         super(directed);
         if(directed){
             try {
@@ -35,6 +36,7 @@ public class MoSSo extends SupernodeHelper {
         n_hash = 4;
         sampleNumber = _sample;
         interval = _interval;
+        threshold = _threshold;
         start = System.currentTimeMillis();
         hash_initialization();
     }
@@ -383,12 +385,14 @@ public class MoSSo extends SupernodeHelper {
                     bestTarget = nbd;
                 }
 
-                // Proceed with MoSSo's original update logic using the newly found best target
-                if (randInt(1, 10) > escape || iteration < 1000) {
-                    tryNodalUpdate(nbd, V.getInt(bestTarget));
-                } else {
-                    // only if the supernode containing nbd is not singleton
-                    if(getSize(V.getInt(nbd)) > 1) tryNodalUpdate(nbd, newSupernode());
+                if (maxSimilarity >= threshold || bestTarget == nbd) {
+                    // Proceed with MoSSo's original update logic using the newly found best target
+                    if (randInt(1, 10) > escape || iteration < 1000) {
+                        tryNodalUpdate(nbd, V.getInt(bestTarget));
+                    } else {
+                        // only if the supernode containing nbd is not singleton
+                        if(getSize(V.getInt(nbd)) > 1) tryNodalUpdate(nbd, newSupernode());
+                    }
                 }
             }
         }
