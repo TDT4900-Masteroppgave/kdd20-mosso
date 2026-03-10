@@ -383,7 +383,7 @@ public class MoSSo extends SupernodeHelper {
 
     // --- Add near the other fields ---
     private final double SIM_START = 0.75;     // initial MinHash/Jaccard threshold
-    private final double SIM_END   = 0.0;    // final threshold (or use 1.0 / n_hash)
+    private final double SIM_END   = 0.125;    // final threshold (or use 1.0 / n_hash)
                                             // tune per dataset; see notes below
 
     /**
