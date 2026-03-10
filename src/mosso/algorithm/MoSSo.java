@@ -461,6 +461,7 @@ public class MoSSo extends SupernodeHelper {
         for (int current_iter = 1; current_iter <= T; current_iter++) {
             
             final double rawThr = similarityThreshold(current_iter, T);
+            final double thr = snapToMinHashBin(rawThr);
             
             // for each partition
             for (IntArrayList partition : srcGrp.values()) {
@@ -491,9 +492,9 @@ public class MoSSo extends SupernodeHelper {
                         }
     
     
-                        if (rawThr == SIM_END && bestTarget == -1) {
+                        if ((rawThr == SIM_END || thr == SIM_END) && bestTarget == -1) {
                             bestTarget = testing_node;
-                        } else if (maxSimilarity >= rawThr || bestTarget == testing_node) {
+                        } else if (maxSimilarity >= thr || bestTarget == testing_node) {
                             // Proceed with MoSSo's original update logic using the newly found best target
                             if (randInt(1, 10) > escape || iteration < 1000) {
                                 tryNodalUpdate(testing_node, V.getInt(bestTarget));
