@@ -15,6 +15,7 @@ def run_sweep(args, datasets_to_run, sweep_values, param, logger, timestamp):
         samples = val if param == "samples" else args.samples
         escape = val if param == "escape" else args.escape
         b = val if param == "b" else args.b
+        thr = val if param == "thr" else args.thr
 
         for i, (url, filename) in enumerate(datasets_to_run, 1):
             dataset_name = filename.replace(".txt", "").replace(".csv", "")
@@ -35,7 +36,8 @@ def run_sweep(args, datasets_to_run, sweep_values, param, logger, timestamp):
                     "samples": params.get('samples', samples),
                     "escape": params.get('escape', escape),
                     "b": params.get('b', b),
-                    "interval": params.get('interval', args.interval)
+                    "interval": params.get('interval', args.interval),
+                    "thr": params.get('thr', thr)
                 }
 
                 t, r, _, _ = run_multiple_mosso(

@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 OUTPUT_DIR = "output"
 VERSIONS_DIR = os.path.join(OUTPUT_DIR, "versions")
@@ -68,5 +69,5 @@ SWEEP_CONFIG = {
     "samples": {"values": [i for i in range(10, 240, 10)], "default": 120},
     "escape": {"values": [i for i in range(1, 9, 2)], "default": 3},
     "b": {"values": [i for i in range(1, 10, 2)], "default": 5},
-    # "thr": {"values": [i for i in range(0.0, 0.4, 0.05)], "default": 0.0},
+    "thr": {"values": [i for i in np.arange(0.0, 0.4, 0.05)], "default": 0.0}
 }
