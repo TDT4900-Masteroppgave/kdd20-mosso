@@ -382,15 +382,9 @@ public class MoSSo extends SupernodeHelper {
     }
 
     // --- Add near the other fields ---
-    private final double SIM_START = 1.0;     // initial MinHash/Jaccard threshold
-    private final double SIM_END   = 1.0 / n_hash;    // final threshold (or use 1.0 / n_hash)
+    private final double SIM_START = 0.75;     // initial MinHash/Jaccard threshold
+    private final double SIM_END   = 0.0;    // final threshold (or use 1.0 / n_hash)
                                             // tune per dataset; see notes below
-
-    // Quantize to multiples of 1/n_hash to match MH resolution.
-    private double _quantizeToMhGrid(double x) {
-        double q = Math.floor(Math.max(0.0, Math.min(1.0, x)) * n_hash + 1e-9) / n_hash;
-        return q;
-    }
 
     /**
      * Geometric, monotonically decreasing threshold across iterations, MAGS-style,
@@ -399,14 +393,25 @@ public class MoSSo extends SupernodeHelper {
      */
     private double similarityThreshold(int t, int T) {
         if (T <= 1) return SIM_END;
-        double ratio = Math.pow(SIM_END / Math.max(1e-9, SIM_START), 1.0 / (T - 1));
-        double raw   = SIM_START * Math.pow(ratio, t - 1);
-        return _quantizeToMhGrid(raw);
+        double ratio = Math.pow(SIM_END / SIM_START, 1.0 / (T - 1));
+        return SIM_START * Math.pow(ratio, t - 1);
     }
+
+    
+    private double snapToMinHashBin(double th) {
+        final double step = 1.0 / n_hash;
+        // keep the schedule slightly conservative (≥ th) so we don't merge too soon
+        double snapped = Math.ceil(th / step) * step;
+        // clamp to [0,1]
+        if (snapped > 1.0) snapped = 1.0;
+        if (snapped < 0.0) snapped = 0.0;
+        return snapped;
+    }
+
 
     private void _divide_and_merge(final int dst, IntArrayList srcnbd, final int which) {
         final int T = 5;
-         // divide noed into paritions using min hash e.g. coarse clustering
+         // divide node into paritions using min hash e.g. coarse clustering
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         // Map: node id -> final bucket key used during coarse clustering
         Int2LongOpenHashMap nodeToBucketKey = new Int2LongOpenHashMap();
@@ -454,6 +459,9 @@ public class MoSSo extends SupernodeHelper {
         }
 
         for (int current_iter = 1; current_iter <= T; current_iter++) {
+            
+            final double rawThr = similarityThreshold(current_iter, T);
+            
             // for each partition
             for (IntArrayList partition : srcGrp.values()) {
                 // while partiotion is not empty (contains nodes to merge)
@@ -482,11 +490,10 @@ public class MoSSo extends SupernodeHelper {
                             }
                         }
     
-                        double threshold = similarityThreshold(current_iter, T);
     
-                        if (threshold == SIM_END && bestTarget == -1) {
+                        if (bestTarget == -1 || rawThr == SIM_START) {
                             bestTarget = testing_node;
-                        } else if (maxSimilarity >= threshold) {
+                        } else if (maxSimilarity >= rawThr || bestTarget == testing_node) {
                             // Proceed with MoSSo's original update logic using the newly found best target
                             if (randInt(1, 10) > escape || iteration < 1000) {
                                 tryNodalUpdate(testing_node, V.getInt(bestTarget));
@@ -495,6 +502,7 @@ public class MoSSo extends SupernodeHelper {
                                 if(getSize(V.getInt(testing_node)) > 1) tryNodalUpdate(testing_node, newSupernode());
                             }
                         }
+                        
                     }
                 }
             }
