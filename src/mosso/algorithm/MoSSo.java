@@ -491,7 +491,7 @@ public class MoSSo extends SupernodeHelper {
                         }
     
     
-                        if (bestTarget == -1 || rawThr == SIM_START) {
+                        if (rawThr == SIM_START && bestTarget == -1) {
                             bestTarget = testing_node;
                         } else if (maxSimilarity >= rawThr || bestTarget == testing_node) {
                             // Proceed with MoSSo's original update logic using the newly found best target
