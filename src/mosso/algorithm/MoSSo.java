@@ -348,6 +348,7 @@ public class MoSSo extends SupernodeHelper {
     }
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
+        IntArrayList porcessedNodeIds = new IntArrayList();
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         if(getDegree(dst) > 0) srcnbd.set(0, dst);
 
@@ -360,7 +361,8 @@ public class MoSSo extends SupernodeHelper {
 
         for (int i = 0; i < sampleNumber; i++) {
             int nbd = srcnbd.getInt(i);
-            if (randInt(1, getDegree(nbd)) <= 1) {
+            if (randInt(1, getDegree(nbd)) <= 1 && !porcessedNodeIds.contains(nbd)) {
+                porcessedNodeIds.add(nbd);
                 long mh = minHash[which].getInt(nbd);
 
                 // MAGS-DM: Similarity Measure
