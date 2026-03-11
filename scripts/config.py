@@ -51,6 +51,11 @@ ALGORITHMS = {
         "branch": "feature/merging_strategy_2_cap",
         "template": ["e", "c", "interval", "cap"]
     },
+    "mosso_tp": {
+        "repo": BASE_REPO_URL,
+        "branch": "feature/tp_similar_nbrs",
+        "template": ["e", "c", "interval"]
+    },
 }
 
 DATASETS = {
