@@ -1,6 +1,7 @@
 package mosso.algorithm;
 
 import it.unimi.dsi.fastutil.ints.*;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import jdk.jshell.spi.ExecutionControl;
 import mosso.SupernodeHelper;
@@ -325,8 +326,56 @@ public class MoSSo extends SupernodeHelper {
         }
     }
 
+    // private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
+    //     Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
+    //     if(getDegree(dst) > 0) srcnbd.set(0, dst);
+
+    //     // coarse clustering using minhash
+    //     for (int v : srcnbd) {
+    //         long target = minHash[which].getInt(v);
+    //         if (!srcGrp.containsKey(target)) srcGrp.put(target, new IntArrayList());
+    //         srcGrp.get(target).add(v);
+    //     }
+
+    //     for (int i = 0; i < sampleNumber; i++) {
+    //         int nbd = srcnbd.getInt(i);
+    //         if (randInt(1, getDegree(nbd)) <= 1) {
+    //             long mh = minHash[which].getInt(nbd);
+
+    //             // MAGS-DM: Similarity Measure
+    //             int bestTarget = -1;
+    //             double maxSimilarity = -1.0;
+
+    //             IntArrayList candidatePool = srcGrp.get(mh);
+    //             for (int candidate: candidatePool) {
+    //                 if (candidate == nbd) continue;
+
+    //                 double similarity = calculateMH(nbd, candidate, maxSimilarity);
+
+    //                 if (similarity > maxSimilarity) {
+    //                     maxSimilarity = similarity;
+    //                     bestTarget = candidate;
+    //                 }
+    //             }
+
+    //             if (bestTarget == -1) {
+    //                 bestTarget = nbd;
+    //             }
+
+    //             // Proceed with MoSSo's original update logic using the newly found best target
+    //             if (randInt(1, 10) > escape || iteration < 1000) {
+    //                 tryNodalUpdate(nbd, V.getInt(bestTarget));
+    //             } else {
+    //                 // only if the supernode containing nbd is not singleton
+    //                 if(getSize(V.getInt(nbd)) > 1) tryNodalUpdate(nbd, newSupernode());
+    //             }
+    //         }
+    //     }
+    // }
+
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
+        IntArrayList porcessedNodeIds = new IntArrayList();
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
         if(getDegree(dst) > 0) srcnbd.set(0, dst);
         // coarse clustering using minhash
@@ -337,7 +386,8 @@ public class MoSSo extends SupernodeHelper {
         }
         for (int i = 0; i < sampleNumber; i++) {
             int nbd = srcnbd.getInt(i);
-            if (randInt(1, getDegree(nbd)) <= 1) {
+            if (randInt(1, getDegree(nbd)) <= 1 && !porcessedNodeIds.contains(nbd)) {
+                porcessedNodeIds.add(nbd);
                 long mh = minHash[which].getInt(nbd);
                 int sz = srcGrp.get(mh).size();
                 // choose random node in the cluster containing nbd
@@ -385,6 +435,117 @@ public class MoSSo extends SupernodeHelper {
                 }
             }
         }
+    }
+
+    
+    /**
+     * MAGS-DM: Calculate estimated Jaccard similarity between two nodes
+     * by comparing their multiple MinHash signatures.
+     */
+    private double calculateMH(int u, int v, double currentBestSim) {
+        int matches = 0;
+        for (int i = 0; i < n_hash; i++) {
+            if (minHash[i].getInt(u) == minHash[i].getInt(v)) {
+                matches++;
+            }
+
+            // OPTIMIZATION: Short-circuit
+            // If the remaining hashes can't possibly result in a better score, stop.
+            int remaining = n_hash - (i + 1);
+            if (((double) matches + remaining) / n_hash < currentBestSim) {
+                return -1.0; // Fail early
+            }
+        }
+        return (double) matches / n_hash;
+    }
+
+    public IntArrayList topKSimilar(final int v, final int k) {
+        IntArrayList nbrs = getNeighbors(v);
+        final IntArrayList resultIds = new IntArrayList();
+        if (k <= 0 || nbrs.isEmpty()) return resultIds;
+
+        final int[] topIds = new int[k];
+        final double[] topSims = new double[k];
+        int size = 0;
+
+        // Current pruning bar for calculateMH:
+        //  - while size < k, pass -1.0 so calculateMH does full evaluation
+        //  - once we have k items, pass the current k-th best (minimum in the buffer)
+        double pruneCut = 0.0;        // real value only meaningful once size == k
+        boolean haveCut = false;      // tracks whether pruneCut is valid
+
+        for (int i = 0; i < nbrs.size(); i++) {
+            final int nbr = nbrs.getInt(i);
+            if (nbr == v) continue;
+
+            final double currentBestSim = haveCut ? pruneCut : -1.0;
+            final double sim = calculateMH(v, nbr, currentBestSim);
+            if (sim < 0.0) continue;               // your calculateMH uses -1.0 to say "cannot beat currentBestSim"
+
+            if (size < k) {
+                topIds[size]  = nbr;
+                topSims[size] = sim;
+                size++;
+
+                if (size == k) {
+                    // compute current minimum among the k to initialize pruneCut
+                    pruneCut = topSims[0];
+                    for (int j = 1; j < k; j++) if (topSims[j] < pruneCut) pruneCut = topSims[j];
+                    haveCut = true;
+                }
+            } else {
+                // find index of current minimum in the top-K buffer
+                int minIdx = 0;
+                double minVal = topSims[0];
+                for (int j = 1; j < k; j++) {
+                    if (topSims[j] < minVal) { minVal = topSims[j]; minIdx = j; }
+                }
+
+                // replace if the new candidate is better than the current minimum
+                if (sim > minVal) {
+                    topIds[minIdx]  = nbr;
+                    topSims[minIdx] = sim;
+
+                    // refresh pruneCut (new k-th best)
+                    pruneCut = topSims[0];
+                    for (int j = 1; j < k; j++) if (topSims[j] < pruneCut) pruneCut = topSims[j];
+                    haveCut = true;
+                }
+            }
+        }
+        
+        if (size == 0) return resultIds;
+        
+        // Sort the buffer by similarity desc (K is small; insertion sort is fine)
+        for (int i = 1; i < size; i++) {
+            int id = topIds[i]; double s = topSims[i];
+            int j = i - 1;
+            while (j >= 0 && topSims[j] < s) {
+                topIds[j + 1]  = topIds[j];
+                topSims[j + 1] = topSims[j];
+                j--;
+            }
+            topIds[j + 1]  = id;
+            topSims[j + 1] = s;
+        }
+        
+        final int numUnique = size;
+        
+        while (size < k) {
+            final int remaining = k - size;
+            
+            final int take = Math.min(remaining, numUnique);     
+            // Copy the first 'take' winners again to fill up
+            for (int i = 0; i < take; i++) {
+                topIds[size + i] = topIds[i];
+            }
+            size += take;
+
+        }
+
+        // Emit ids in order. If you also need scores, see the overload below.
+        for (int i = 0; i < size; i++) resultIds.add(topIds[i]);
+        return resultIds;
     }
 
     @Override
