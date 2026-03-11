@@ -375,29 +375,32 @@ public class MoSSo extends SupernodeHelper {
 
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
-        IntArrayList porcessedNodeIds = new IntArrayList();
+        IntArrayList testing_pool = new IntArrayList();
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
-        if(getDegree(dst) > 0) srcnbd.set(0, dst);
+        for (int nbd : srcnbd) {
+            if(!testing_pool.contains(nbd) && randInt(1, getDegree(nbd)) <= 1) {
+                testing_pool.add(nbd);
+            }
+        }
+
+        if(getDegree(dst) > 0 && !testing_pool.contains(dst)) testing_pool.add(dst);
         // coarse clustering using minhash
-        for (int v : srcnbd) {
+        for (int v : testing_pool) {
             long target = minHash[which].getInt(v);
             if (!srcGrp.containsKey(target)) srcGrp.put(target, new IntArrayList());
             srcGrp.get(target).add(v);
         }
-        for (int i = 0; i < sampleNumber; i++) {
-            int nbd = srcnbd.getInt(i);
-            if (randInt(1, getDegree(nbd)) <= 1 && !porcessedNodeIds.contains(nbd)) {
-                porcessedNodeIds.add(nbd);
-                long mh = minHash[which].getInt(nbd);
-                int sz = srcGrp.get(mh).size();
-                // choose random node in the cluster containing nbd
-                int target = srcGrp.get(mh).getInt(randInt(0, sz - 1));
-                if (randInt(1, 10) > escape || iteration < 1000) {
-                    tryNodalUpdate(nbd, V.getInt(target));
-                } else {
-                    // only if the supernode containing nbd is not singleton
-                    if(getSize(V.getInt(nbd)) > 1) tryNodalUpdate(nbd, newSupernode());
-                }
+        for (int nbd : testing_pool) {
+            long mh = minHash[which].getInt(nbd);
+            int sz = srcGrp.get(mh).size();
+            // choose random node in the cluster containing nbd
+            int target = srcGrp.get(mh).getInt(randInt(0, sz - 1));
+            if (randInt(1, 10) > escape || iteration < 1000) {
+                tryNodalUpdate(nbd, V.getInt(target));
+            } else {
+                // only if the supernode containing nbd is not singleton
+                if(getSize(V.getInt(nbd)) > 1) tryNodalUpdate(nbd, newSupernode());
+            }
             }
         }
     }
