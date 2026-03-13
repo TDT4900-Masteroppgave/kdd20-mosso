@@ -2,8 +2,8 @@ import os
 import pandas as pd
 from tabulate import tabulate
 
-from config import BENCHMARK_DIR, RUNS_DIR, PARAM_CONFIG
-from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple_mosso
+from config import BENCHMARK_DIR, RUNS_DIR, PARAM_CONFIG, PROJECT_NAME
+from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple_algorithms
 from plotter import plot_results, plot_runs_variance
 from benchmark import Benchmark
 
@@ -36,7 +36,7 @@ class CompareBenchmark(Benchmark):
             all_times_dict, all_ratios_dict = {}, {}
 
             for algo_name, algo_config in self.active_algos.items():
-                jar_file = f"mosso-{algo_name}.jar"
+                jar_file = f"{PROJECT_NAME}-{algo_name}.jar"
                 if not os.path.exists(jar_file):
                     continue
 
@@ -47,7 +47,7 @@ class CompareBenchmark(Benchmark):
                 for p_key in PARAM_CONFIG.keys():
                     resolved_params[p_key] = params.get(p_key, getattr(args, p_key))
 
-                t_avg, r_avg, t_list, r_list = run_multiple_mosso(
+                t_avg, r_avg, t_list, r_list = run_multiple_algorithms(
                     jar_file, path, f"{algo_name}_{dataset_name}_{timestamp}",
                     args.runs, not args.keep_summaries, logger, resolved_params, template
                 )

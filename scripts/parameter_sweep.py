@@ -2,8 +2,8 @@ import os
 import pandas as pd
 from tabulate import tabulate
 
-from config import SWEEP_DIR, PARAM_CONFIG
-from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple_mosso
+from config import SWEEP_DIR, PARAM_CONFIG, PROJECT_NAME
+from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple_algorithms
 from plotter import plot_parameter_analysis
 from benchmark import Benchmark
 
@@ -50,7 +50,7 @@ class ParameterSweepBenchmark(Benchmark):
                 current_result = {"Dataset": dataset_name, param: val}
 
                 for algo_name, algo_config in self.active_algos.items():
-                    jar_file = f"mosso-{algo_name}.jar"
+                    jar_file = f"{PROJECT_NAME}-{algo_name}.jar"
                     if not os.path.exists(jar_file): continue
 
                     template = algo_config.get('template', [])
@@ -63,7 +63,7 @@ class ParameterSweepBenchmark(Benchmark):
                         current_fallback = val if param == p_key else getattr(args, p_key)
                         resolved_params[p_key] = params.get(p_key, current_fallback)
 
-                    t, r, _, _ = run_multiple_mosso(
+                    t, r, _, _ = run_multiple_algorithms(
                         jar_file, path, f"{algo_name}_{dataset_name}_{param}{val}_{timestamp}",
                         args.runs, True, logger, resolved_params, template)
 

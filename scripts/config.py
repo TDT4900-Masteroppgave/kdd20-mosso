@@ -12,6 +12,9 @@ LOG_DIR = os.path.join(OUTPUT_DIR, "logs")
 
 BASE_REPO_URL = "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git"
 
+PROJECT_NAME = "mosso"
+JAVA_MAIN_CLASS = "mosso.Run"
+
 PARAM_CONFIG = {
     "c": {"description": "sample number", "default": 120, "bounds": (10, 240)},
     "e": {"description": "escape", "default": 3, "bounds": (1, 9)},
