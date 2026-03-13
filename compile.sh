@@ -3,7 +3,10 @@ set -e
 
 echo "[*] Compiling Java sources..."
 
-rm -rf class mosso-1.0.jar
+PROJECT_NAME="mosso"
+JAR_NAME="${PROJECT_NAME}-1.0.jar"
+
+rm -rf class $JAR_NAME
 mkdir -p class
 
 # shellcheck disable=SC2012
@@ -19,10 +22,10 @@ javac -cp "./$FASTUTIL_JAR" -d class $(find ./src -name "*.java")
 
 echo "[*] Creating JAR archive..."
 cd class
-jar cf mosso-1.0.jar ./
-mv mosso-1.0.jar ../
+jar cf $JAR_NAME ./
+mv $JAR_NAME ../
 cd ..
 
 rm -rf class
 
-echo "[*] Build complete: mosso-1.0.jar"
+echo "[*] Build complete: $JAR_NAME"

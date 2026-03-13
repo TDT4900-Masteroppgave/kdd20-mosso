@@ -33,8 +33,8 @@ def build_jars(is_local, logger, algorithms):
         logger.info("[*] Compiling current Local code...")
         try:
             subprocess.run(["bash", "compile.sh"], cwd=".", check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-            shutil.move("mosso-1.0.jar", "mosso-Local.jar")
-            logger.info("\t[OK] Successfully built mosso-Local.jar")
+            shutil.move(f"{PROJECT_NAME}-1.0.jar", f"{PROJECT_NAME}-Local.jar")
+            logger.info(f"\t[OK] Successfully built {PROJECT_NAME}-Local.jar")
         except subprocess.CalledProcessError as e:
             logger.error(f"\t[!] Failed to build Local code. Compile Error: {e.stderr.strip()}")
             return
@@ -50,7 +50,7 @@ def build_jars(is_local, logger, algorithms):
 
         repo_url = str(config['repo'])
         branch = str(config['branch'])
-        jar_name = f"mosso-{algo_name}.jar"
+        jar_name = f"{PROJECT_NAME}-{algo_name}.jar"
         target_dir = str(os.path.join(VERSIONS_DIR, algo_name))
 
         logger.debug(f"\t-> Building {algo_name} (Repo: {repo_url.split('/')[-1]} | Branch: {branch})...")
@@ -66,7 +66,7 @@ def build_jars(is_local, logger, algorithms):
 
             shutil.copy(fastutil, os.path.join(target_dir, fastutil))
             subprocess.run(["bash", "compile.sh"], cwd=target_dir, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-            shutil.move(os.path.join(target_dir, "mosso-1.0.jar"), jar_name)
+            shutil.move(os.path.join(target_dir, f"{PROJECT_NAME}-1.0.jar"), jar_name)
             logger.info(f"\t[OK] Successfully built {jar_name}")
 
         except subprocess.CalledProcessError as e:
@@ -155,7 +155,7 @@ def setup_logging(run_type):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # The unique ID
     log_file = os.path.join(LOG_DIR, f"{run_type}_{timestamp}.log")
 
-    logger = logging.getLogger("MoSSo")
+    logger = logging.getLogger(PROJECT_NAME)
     logger.setLevel(logging.DEBUG)
     logger.handlers = []
 
@@ -236,12 +236,12 @@ def get_datasets_to_run(args):
                 datasets_to_run.append((url, filename))
     return datasets_to_run
 
-def run_mosso(jar_file, dataset_path, output_name, discard_summaries, logger, parameters, template):
+def run_algorithm(jar_file, dataset_path, output_name, discard_summaries, logger, parameters, template):
     classpath = f"{get_fastutil_path()}{os.pathsep}{jar_file}"
     out_file = os.path.join(RUNS_DIR, output_name)
     log_file = f"{out_file}.log"
 
-    cmd = ["java", "-cp", classpath, "mosso.Run", dataset_path, output_name, "mosso"]
+    cmd = ["java", "-cp", classpath, JAVA_MAIN_CLASS, dataset_path, output_name, PROJECT_NAME]
     for param_key in template:
         cmd.append(str(parameters[param_key]))
 
@@ -282,11 +282,11 @@ def run_mosso(jar_file, dataset_path, output_name, discard_summaries, logger, pa
         logger.error(f"Execution failed for {output_name}: {e}")
         return None, None
 
-def run_multiple_mosso(jar_file, dataset_path, output_name, runs, discard_summaries, logger, parameters, template):
+def run_multiple_algorithms(jar_file, dataset_path, output_name, runs, discard_summaries, logger, parameters, template):
     times, ratios = [], []
     for i in range(runs):
         logger.debug(f"Iter {i+1}/{runs} for {output_name}...")
-        t, r = run_mosso(jar_file, dataset_path, f"{output_name}_run{i+1}", discard_summaries, logger, parameters, template)
+        t, r = run_algorithm(jar_file, dataset_path, f"{output_name}_run{i+1}", discard_summaries, logger, parameters, template)
         if t is not None and r is not None:
             times.append(t)
             ratios.append(r)
