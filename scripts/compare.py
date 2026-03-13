@@ -2,14 +2,15 @@ import os
 import pandas as pd
 from tabulate import tabulate
 
-from config import BENCHMARK_DIR, RUNS_DIR, PARAM_CONFIG
-from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple_mosso
+from config import COMPARE_DIR, RUNS_DIR, PARAM_CONFIG
+from runners import get_runner
+from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline
 from plotter import plot_results, plot_runs_variance
 from benchmark import Benchmark
 
 class CompareBenchmark(Benchmark):
     def __init__(self):
-        super().__init__("compare", BENCHMARK_DIR)
+        super().__init__("compare", COMPARE_DIR)
 
     def add_custom_args(self, parser):
         parser.add_argument("--keep-summaries", action="store_true")
@@ -18,49 +19,48 @@ class CompareBenchmark(Benchmark):
         return "compare"
 
     def process(self):
-        args = self.args
-        logger = self.logger
-        datasets_to_run = self.datasets_to_run
-        timestamp = self.timestamp
-
         results = []
-
-        for i, (url, filename) in enumerate(datasets_to_run, 1):
+        for i, (url, filename) in enumerate(self.datasets_to_run, 1):
             dataset_name = filename.replace(".txt", "").replace(".csv", "")
-            path = prepare_dataset(filename, logger) if url == "local" else download_and_prepare_dataset(url, filename,
-                                                                                                         logger)
-            if not path: continue
+            dataset_path = download_and_prepare_dataset(url, filename,
+                                             self.logger)
+            if not dataset_path:
+                raise RuntimeError(f"Failed to download dataset {filename}.")
 
-            logger.info(f"[{i}/{len(datasets_to_run)}] Benchmarking [{dataset_name}] ({args.runs} runs) ...")
+            self.logger.info(f"[{i}/{len(self.datasets_to_run)}] Benchmarking [{dataset_name}] ({self.args.runs} runs) ...")
             current_result = {"Dataset": dataset_name}
             all_times_dict, all_ratios_dict = {}, {}
 
             for algo_name, algo_config in self.active_algos.items():
-                jar_file = f"mosso-{algo_name}.jar"
-                if not os.path.exists(jar_file):
+                runner = get_runner(algo_name, algo_config, self.logger, RUNS_DIR)
+                if not runner.binary_exists():
+                    self.logger.warning(f"[!] Binary not found for {algo_name}. Skipping.")
                     continue
 
-                template = algo_config.get('template')
+                resolved_params = {}
+                template = algo_config.get('template', [])
                 params = algo_config.get('params', {})
-
-                resolved_params = {"interval": params.get('interval', args.interval)}
                 for p_key in PARAM_CONFIG.keys():
-                    resolved_params[p_key] = params.get(p_key, getattr(args, p_key))
+                    resolved_params[p_key] = params.get(p_key, getattr(self.args, p_key))
 
-                t_avg, r_avg, t_list, r_list = run_multiple_mosso(
-                    jar_file, path, f"{algo_name}_{dataset_name}_{timestamp}",
-                    args.runs, not args.keep_summaries, logger, resolved_params, template
+                t_avg, r_avg, t_list, r_list = runner.run_multiple(
+                    dataset_path=dataset_path,
+                    base_output_name=f"{algo_name}_{dataset_name}_{self.timestamp}",
+                    runs=self.args.runs,
+                    parameters=resolved_params,
+                    template=template
                 )
 
                 if t_avg is not None:
-                    current_result[f"Time_{algo_name}"], current_result[f"Ratio_{algo_name}"] = t_avg, r_avg
-                    logger.info(f"\t=> {algo_name: <12} Time: {t_avg:.3f}s | Ratio: {r_avg:.5f}")
-                    if args.runs > 1:
+                    current_result[f"Time_{algo_name}"] = t_avg
+                    current_result[f"Ratio_{algo_name}"] = r_avg
+                    self.logger.info(f"\t=> {algo_name: <12} Time: {t_avg:.3f}s | Ratio: {r_avg:.5f}")
+                    if self.args.runs > 1:
                         all_times_dict[algo_name], all_ratios_dict[algo_name] = t_list, r_list
 
             results.append(current_result)
-            if args.runs > 1:
-                plot_runs_variance(f"{dataset_name}_{timestamp}", all_times_dict, all_ratios_dict, RUNS_DIR)
+            if self.args.runs > 1:
+                plot_runs_variance(f"{dataset_name}_{self.timestamp}", all_times_dict, all_ratios_dict, RUNS_DIR)
 
         self.results = results
 
@@ -81,7 +81,6 @@ class CompareBenchmark(Benchmark):
         csv_file = os.path.join(self.save_dir, f"results_{self.timestamp}.csv")
         pd.DataFrame(self.results).to_csv(csv_file, index=False)
         plot_results(csv_file, os.path.join(self.save_dir, f"plot_{self.timestamp}.pdf"), self.logger)
-
 
 if __name__ == "__main__":
     CompareBenchmark().run()

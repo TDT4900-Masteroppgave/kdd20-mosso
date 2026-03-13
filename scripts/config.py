@@ -1,14 +1,15 @@
 import os
 
 OUTPUT_DIR = "output"
-VERSIONS_DIR = os.path.join(OUTPUT_DIR, "versions")
 DATASETS_DIR = "datasets"
 
-BENCHMARK_DIR = os.path.join(OUTPUT_DIR, "benchmark")
-RUNS_DIR = os.path.join(BENCHMARK_DIR, "runs")
-SUMMARIZED_DIR = os.path.join(BENCHMARK_DIR, "summarized_graphs")
-SWEEP_DIR = os.path.join(OUTPUT_DIR, "parameter_sweep")
-LOG_DIR = os.path.join(OUTPUT_DIR, "logs")
+BENCHMARK_DIR = os.path.join(OUTPUT_DIR, "benchmarks")
+VERSIONS_DIR = os.path.join(BENCHMARK_DIR, "versions")
+COMPARE_DIR = os.path.join(BENCHMARK_DIR, "compare")
+RUNS_DIR = os.path.join(COMPARE_DIR, "runs")
+SUMMARIZED_DIR = os.path.join(COMPARE_DIR, "summarized_graphs")
+SWEEP_DIR = os.path.join(BENCHMARK_DIR, "parameter_sweep")
+LOG_DIR = os.path.join(BENCHMARK_DIR, "logs")
 
 BASE_REPO_URL = "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git"
 
@@ -22,28 +23,52 @@ PARAM_CONFIG = {
 
 ALGORITHMS = {
     "local": {
+        "target_dir": ".",
+        "lang": "java",
         "template": ["e", "c", "interval"]
     },
     "kdd20-mosso": {
         "repo": "https://github.com/jihoonko/kdd20-mosso.git",
         "branch": "master",
         "params" : {"c": 120, "e": 3},
-        "template": ["e", "c", "interval"]
+        "lang": "java",
+        "template": ["e", "c", "interval"],
+        "binary_file": "kdd20-mosso.jar"
     },
     "strat_1": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1",
-        "template": ["e", "c", "interval"]
+        "lang": "java",
+        "template": ["e", "c", "interval"],
+        "binary_file": "mosso-strat_1.jar",
     },
     "strat_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_2",
-        "template": ["e", "c", "interval", "h"]
+        "lang": "java",
+        "template": ["e", "c", "interval", "h"],
+        "binary_file": "mosso-strat_2.jar",
     },
     "strat_1_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1_2",
-        "template": ["e", "c", "interval", "b"]
+        "lang": "java",
+        "template": ["e", "c", "interval", "b"],
+        "binary_file": "mosso-strat_2.jar",
+    },
+    "mags": {
+        "repo": "https://github.com/nedchu/mags-release",
+        "branch": "main",
+        "lang": "cpp",
+        "template": [],
+        "binary_file": "mags",
+    },
+    "mags-dm": {
+        "repo": "https://github.com/nedchu/mags-release",
+        "branch": "main",
+        "lang": "cpp",
+        "template": [],
+        "binary_file": "mags_dm",
     },
 }
 

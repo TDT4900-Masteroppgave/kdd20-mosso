@@ -5,7 +5,7 @@ from scipy.stats import qmc
 
 from config import PARAM_CONFIG, OUTPUT_DIR
 from plotter import plot_pareto_front, get_pareto_front_2d
-from utils import prepare_dataset, download_and_prepare_dataset, run_multiple_mosso
+from utils import prepare_dataset, download_and_prepare_dataset
 from benchmark import Benchmark
 
 LHS_DIR = os.path.join(OUTPUT_DIR, "lhs_optimization")
@@ -28,6 +28,7 @@ class LHSBenchmark(Benchmark):
 
     def generate_lhs_samples(self, algo_template):
         """Generates scaled LHS configurations for the active template."""
+        # TODO: Add Seed? Add optimization="lloyd" (Maximin LHS)?
         sampler = qmc.LatinHypercube(d=len(algo_template))
         sample = sampler.random(n=self.args.samples)
 
@@ -51,7 +52,7 @@ class LHSBenchmark(Benchmark):
             if not path: continue
 
             for algo_name, algo_config in self.active_algos.items():
-                jar_file = f"mosso-{algo_name}.jar"
+                jar_file = f"{algo_name}.jar"
                 if not os.path.exists(jar_file): continue
 
                 template = algo_config.get('template', [])
@@ -60,7 +61,7 @@ class LHSBenchmark(Benchmark):
                 for run_idx, params in enumerate(lhs_configs, 1):
                     self.logger.info(f"[{dataset_name} | {algo_name}] Testing Config {run_idx}/{self.args.samples}: {params}")
 
-                    t, r, _, _ = run_multiple_mosso(
+                    t, r, _, _ = run_multiple(
                         jar_file, path, f"{algo_name}_{dataset_name}_lhs{run_idx}_{self.timestamp}",
                         self.args.runs, True, self.logger, params, template)
 

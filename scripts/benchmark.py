@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from config import PARAM_CONFIG, ALGORITHMS, DATASETS
-from utils import setup_logging, setup_directories, build_jars, get_datasets_to_run
+from config import PARAM_CONFIG, ALGORITHMS, DATASETS, RUNS_DIR
+from utils import setup_logging, setup_directories, get_datasets_to_run
 import argparse
 
 class Benchmark(ABC):
@@ -32,10 +32,8 @@ class Benchmark(ABC):
         self.add_custom_args(parser)
 
         args = parser.parse_args()
-        args.local = False
 
         if args.algos:
-            if "local" in args.algos: args.local = True
             self.active_algos = {k: v for k, v in ALGORITHMS.items() if k in args.algos}
         else:
             self.active_algos = {k: v for k, v in ALGORITHMS.items() if k != "local"}
@@ -72,21 +70,22 @@ class Benchmark(ABC):
         pass
 
     def setup(self):
-        """Logic for setting up the benchmark environment."""
         self.datasets_to_run = get_datasets_to_run(self.args)
         setup_directories()
-        build_jars(self.args.local, self.logger, self.active_algos.items())
+
+        from runners import get_runner
+        self.logger.info("[*] Compiling configured algorithms...")
+
+        for algo_name, config in self.active_algos.items():
+            self.logger.info(f"\tBuilding {algo_name}")
+            runner = get_runner(algo_name, config, self.logger, RUNS_DIR)
+            runner.build()
 
     def get_algo_param_display(self, p_key, default_val):
         """Hook method. Allows subclasses to override parameter display formatting."""
         return default_val
 
-    def run(self):
-        """The main execution lifecycle."""
-        self.logger.info("=" * 10 + f"{' STAGE 1: SETUP & COMPILATION ':^30}" + "=" * 10)
-        self.setup()
-
-        self.logger.info("[*] Global Execution Parameters:")
+    def print_parameters(self):
         for arg_key, arg_val in vars(self.args).items():
             if arg_key not in PARAM_CONFIG:
                 self.logger.info(" "*4 + f"- {arg_key}: {arg_val}")
@@ -109,14 +108,30 @@ class Benchmark(ABC):
                     display_val = self.get_algo_param_display(p_key, base_val)
                     self.logger.info(" "*4 + f"- {p_key}: {display_val}")
 
-        self.logger.info("[*] Datasets to Run:")
-        for url, filename in self.datasets_to_run:
-            self.logger.info(f" "*4 + f"- {filename}")
+    def run(self):
+        """The main execution lifecycle."""
+        self.logger.info("=" * 10 + f"{' STAGE 1: SETUP & COMPILATION ':^30}" + "=" * 10)
+        try:
+            self.setup()
+
+            self.logger.info("[*] Parameters:")
+            self.print_parameters()
+
+            self.logger.info(f"[*] Datasets to Run ({len(self.datasets_to_run)}):")
+            for url, filename in self.datasets_to_run:
+                self.logger.info(f" "*4 + f"- {filename}")
+        except Exception as e:
+            self.logger.error(f"[!] Setup aborted: {e}")
+            return
 
         self.logger.info("=" * 10 + f"{' STAGE 2: PROCESSING ':^30}" + "=" * 10)
-        self.process()
+        try:
+            self.process()
+        except RuntimeError as e:
+            self.logger.error(f"[!] Processing aborted: {e}")
+            return
 
-        if self.results:
+        if self.results and len(self.results[0]) > 1:
             self.logger.info("=" * 10 + f"{' STAGE 3: RESULTS & ARTIFACTS ':^30}" + "=" * 10)
             self.print_table()
             self.finalize()

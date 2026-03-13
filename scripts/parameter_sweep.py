@@ -3,7 +3,7 @@ import pandas as pd
 from tabulate import tabulate
 
 from config import SWEEP_DIR, PARAM_CONFIG
-from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple_mosso
+from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple
 from plotter import plot_parameter_analysis
 from benchmark import Benchmark
 
@@ -28,57 +28,43 @@ class ParameterSweepBenchmark(Benchmark):
         return default_val
 
     def process(self):
-        args = self.args
-        logger = self.logger
-        datasets_to_run = self.datasets_to_run
-        timestamp = self.timestamp
-        param = self.args.param
-
         results = []
-
         for val in self.sweep_values:
-            logger.info(f"--- Testing {param.upper()} = {val} ---")
+            self.logger.info(f"--- Testing {self.args.param.upper()} = {val} ---")
 
-            for i, (url, filename) in enumerate(datasets_to_run, 1):
+            for i, (url, filename) in enumerate(self.datasets_to_run, 1):
                 dataset_name = filename.replace(".txt", "").replace(".csv", "")
-                path = prepare_dataset(filename, logger) if url == "local" else download_and_prepare_dataset(url,
+                path = prepare_dataset(filename, self.logger) if url == "local" else download_and_prepare_dataset(url,
                                                                                                              filename,
-                                                                                                             logger)
+                                                                                                             self.logger)
                 if not path: continue
 
-                logger.info(f"[{i}/{len(datasets_to_run)}] Running {dataset_name} ({args.runs} runs) ...")
-                current_result = {"Dataset": dataset_name, param: val}
+                self.logger.info(f"[{i}/{len(self.datasets_to_run)}] Running {dataset_name} ({self.args.runs} runs) ...")
+                current_result = {"Dataset": dataset_name, self.args.param: val}
 
-                for algo_name, algo_config in self.active_algos.items():
-                    jar_file = f"mosso-{algo_name}.jar"
-                    if not os.path.exists(jar_file): continue
+                for algo_name, config in self.active_algos.items():
+                    binary_file = config.get('binary_file')
+                    if not os.path.exists(binary_file): continue
 
-                    template = algo_config.get('template', [])
-                    params = algo_config.get('params', {})
+                    template = config.get('template', [])
+                    params = config.get('params', {})
 
                     resolved_params = {
-                        "interval": params.get('interval', args.interval)
+                        "interval": params.get('interval', self.args.interval)
                     }
                     for p_key in PARAM_CONFIG.keys():
-                        current_fallback = val if param == p_key else getattr(args, p_key)
+                        current_fallback = val if self.args.param == p_key else getattr(self.args, p_key)
                         resolved_params[p_key] = params.get(p_key, current_fallback)
 
-                    t, r, _, _ = run_multiple_mosso(
-                        jar_file, path, f"{algo_name}_{dataset_name}_{param}{val}_{timestamp}",
-                        args.runs, True, logger, resolved_params, template)
+                    t, r, _, _ = run_multiple(
+                        binary_file, path, f"{algo_name}_{dataset_name}_{self.args.param}{val}_{self.timestamp}",
+                        self.args.runs, True, self.logger, resolved_params, template)
 
                     if t is not None:
                         current_result[f"Time_{algo_name}"], current_result[f"Ratio_{algo_name}"] = t, r
-                        logger.info(f"\t=> {algo_name: <12} Time: {t:.3f}s | Ratio: {r:.5f}")
+                        self.logger.info(f"\t=> {algo_name: <12} Time: {t:.3f}s | Ratio: {r:.5f}")
 
                 results.append(current_result)
-
-            if results:
-                master_csv = os.path.join(SWEEP_DIR, f"sweep_{param}_results_{timestamp}.csv")
-                pd.DataFrame(results).to_csv(master_csv, index=False)
-                plot_parameter_analysis(master_csv, param,
-                                        os.path.join(SWEEP_DIR, f"sweep_{param}_plot_{timestamp}.pdf"))
-
         self.results = results
 
     def print_table(self):
@@ -99,7 +85,10 @@ class ParameterSweepBenchmark(Benchmark):
             self.logger.info(line)
 
     def finalize(self):
-        pass
+        file_name = f"sweep_{self.args.param}_results_{self.timestamp}"
+        master_csv = os.path.join(SWEEP_DIR, f"{file_name}.csv")
+        pd.DataFrame(self.results).to_csv(master_csv, index=False)
+        plot_parameter_analysis(master_csv, self.args.param, os.path.join(SWEEP_DIR, f"{file_name}.pdf"))
 
 
 if __name__ == "__main__":
