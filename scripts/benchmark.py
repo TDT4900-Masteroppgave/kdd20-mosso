@@ -23,7 +23,7 @@ class Benchmark(ABC):
         parser.add_argument("--file", type=str, help="Specific local graph file.")
         parser.add_argument("--runs", type=int, default=1)
         parser.add_argument("--group", choices=["all"] + list(DATASETS.keys()), default="all")
-        parser.add_argument("--algos", nargs='+', help="Specific algorithms to run")
+        parser.add_argument("--algorithm", nargs='+', help="Specific algorithms to run")
         parser.add_argument("--baseline", type=str, help="Algorithm for relative comparisons")
 
         for p_name, p_data in PARAM_CONFIG.items():
