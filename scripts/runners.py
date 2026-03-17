@@ -5,8 +5,8 @@ import re
 import platform
 from abc import ABC, abstractmethod
 
-from config import VERSIONS_DIR, SUMMARIZED_DIR
-from utils import get_fastutil_path, retrieve_github_code
+from scripts.config import VERSIONS_DIR, SUMMARIZED_DIR
+from scripts.utils import get_fastutil_path, retrieve_github_code
 
 class AlgorithmRunner(ABC):
     edge_format_string = "{u}\t{v}\n"
@@ -294,7 +294,7 @@ target_link_libraries({binary_file} PRIVATE OpenMP::OpenMP_CXX)
 if(MSVC)
     target_compile_options({binary_file} PRIVATE /W0 /openmp:llvm /O2)
 else()
-    target_compile_options({binary_file} PRIVATE -w -03)
+    target_compile_options({binary_file} PRIVATE -w -O3)
 endif()
 """
         cmake_path = os.path.join(self.target_dir, "CMakeLists.txt")

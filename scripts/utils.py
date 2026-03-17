@@ -5,11 +5,11 @@ import gzip
 import glob
 import pandas as pd
 
-from config import *
+from scripts.config import *
 import logging
 import sys
 from datetime import datetime
-from config import LOG_DIR, RUNS_DIR, SUMMARIZED_DIR
+from scripts.config import LOG_DIR, RUNS_DIR, SUMMARIZED_DIR
 
 def get_fastutil_path():
     fastutil_files = glob.glob("fastutil-*.jar")

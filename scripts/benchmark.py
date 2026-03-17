@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 
-from config import PARAM_CONFIG, ALGORITHMS, DATASETS, RUNS_DIR
-from utils import setup_logging, setup_directories, get_datasets_to_run
+from scripts.config import PARAM_CONFIG, ALGORITHMS, DATASETS, RUNS_DIR
+from scripts.utils import setup_logging, setup_directories, get_datasets_to_run
+from scripts.runners import get_runner
 import argparse
 
 class Benchmark(ABC):
@@ -33,8 +34,8 @@ class Benchmark(ABC):
 
         args = parser.parse_args()
 
-        if args.algos:
-            self.active_algos = {k: v for k, v in ALGORITHMS.items() if k in args.algos}
+        if args.algorithm:
+            self.active_algos = {k: v for k, v in ALGORITHMS.items() if k in args.algorithm}
         else:
             self.active_algos = {k: v for k, v in ALGORITHMS.items() if k != "local"}
 
@@ -73,7 +74,7 @@ class Benchmark(ABC):
         self.datasets_to_run = get_datasets_to_run(self.args)
         setup_directories()
 
-        from runners import get_runner
+
         self.logger.info("[*] Compiling configured algorithms...")
 
         for algo_name, config in self.active_algos.items():

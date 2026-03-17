@@ -37,17 +37,17 @@ done
 
 case $TYPE in
     compare)
-        python3 scripts/benchmarks/compare.py "$@"
+        python3 -m scripts.benchmarks.compare "$@"
         ;;
     sweep)
-        python3 scripts/benchmarks/parameter_sweep.py "$@"
+        python3 -m scripts.benchmarks.parameter_sweep "$@"
         ;;
     latin)
-        python3 scripts/benchmarks/latin_hypercube.py "$@"
+        python3 -m scripts.benchmarks.latin_hypercube "$@"
         ;;
     *)
         echo "Usage: ./run.sh --type {compare|sweep|latin} [options]"
-        echo "Example: ./run.sh --type compare --group one --algos mags"
+        echo "Example: ./run.sh --type compare --methods mags --group one"
         exit 1
         ;;
 esac
