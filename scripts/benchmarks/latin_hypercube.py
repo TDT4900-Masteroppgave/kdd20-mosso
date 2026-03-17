@@ -3,10 +3,10 @@ import pandas as pd
 from tabulate import tabulate
 from scipy.stats import qmc
 
-from config import PARAM_CONFIG, OUTPUT_DIR
-from plotter import plot_pareto_front, get_pareto_front_2d
-from utils import prepare_dataset, download_and_prepare_dataset
-from benchmark import Benchmark
+from scripts.config import PARAM_CONFIG, OUTPUT_DIR
+from scripts.plotter import plot_pareto_front, get_pareto_front_2d
+from scripts.utils import prepare_dataset, download_and_prepare_dataset
+from scripts.benchmark import Benchmark
 
 LHS_DIR = os.path.join(OUTPUT_DIR, "lhs_optimization")
 

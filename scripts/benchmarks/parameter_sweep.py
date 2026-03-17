@@ -2,10 +2,10 @@ import os
 import pandas as pd
 from tabulate import tabulate
 
-from config import SWEEP_DIR, PARAM_CONFIG
-from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple
-from plotter import plot_parameter_analysis
-from benchmark import Benchmark
+from scripts.config import SWEEP_DIR, PARAM_CONFIG
+from scripts.utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple
+from scripts.plotter import plot_parameter_analysis
+from scripts.benchmark import Benchmark
 
 class ParameterSweepBenchmark(Benchmark):
     def __init__(self):

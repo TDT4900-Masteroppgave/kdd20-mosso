@@ -2,11 +2,11 @@ import os
 import pandas as pd
 from tabulate import tabulate
 
-from config import COMPARE_DIR, RUNS_DIR, PARAM_CONFIG
-from runners import get_runner
-from utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline
-from plotter import plot_results, plot_runs_variance
-from benchmark import Benchmark
+from scripts.config import COMPARE_DIR, RUNS_DIR, PARAM_CONFIG
+from scripts.runners import get_runner
+from scripts.utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline
+from scripts.plotter import plot_results, plot_runs_variance
+from scripts.benchmark import Benchmark
 
 class CompareBenchmark(Benchmark):
     def __init__(self):
