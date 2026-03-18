@@ -1,5 +1,6 @@
 package mosso.algorithm;
 
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import jdk.jshell.spi.ExecutionControl;
@@ -371,28 +372,55 @@ public class MoSSo extends SupernodeHelper {
             long mh = minHash[which].getInt(testing_node);
 
             // MAGS-DM: Similarity Measure
-            int bestTarget = -1;
-            double maxSimilarity = -1.0;
+            IntArrayList candidates = new IntArrayList();
+            DoubleArrayList weights = new DoubleArrayList();
+            double totalWeight = 0.0;
+
+            double currentBestSim = -1.0; // still used for pruning
+            int target;
 
             IntArrayList candidatePool = srcGrp.get(mh);
             for (int candidate: candidatePool) {
                 if (candidate == testing_node) continue;
 
-                double similarity = calculateMH(testing_node, candidate, maxSimilarity);
+                double similarity = calculateMH(testing_node, candidate, currentBestSim);
 
-                if (similarity > maxSimilarity) {
-                    maxSimilarity = similarity;
-                    bestTarget = candidate;
+           
+                if (similarity <= 0.0) continue; // pruned or zero similarity
+
+                candidates.add(candidate);
+                weights.add(similarity);
+                totalWeight += similarity;
+
+                
+                 if (similarity > currentBestSim) {
+                    currentBestSim = similarity; 
+                }
+
+
+            }
+
+            
+            if (candidates.isEmpty()) {
+                target = testing_node; // fallback
+            } else {
+                double r = randDouble() * totalWeight; // random weight
+                double acc = 0.0; // accumulating weight
+
+                target = candidates.getInt(0); // default
+                for (int i = 0; i < candidates.size(); i++) {
+                    acc += weights.getDouble(i); // accumulates weight
+                    if (r <= acc) { // selected random weight reached! 
+                        target = candidates.getInt(i); // sets the candidate as selected
+                        break;
+                    }
                 }
             }
 
-            if (bestTarget == -1) {
-                bestTarget = testing_node;
-            }
 
             // Proceed with MoSSo's original update logic using the newly found best target
             if (randInt(1, 10) > escape || iteration < 1000) {
-                tryNodalUpdate(testing_node, V.getInt(bestTarget));
+                tryNodalUpdate(testing_node, V.getInt(target));
             } else {
                 // only if the supernode containing nbd is not singleton
                 if(getSize(V.getInt(testing_node)) > 1) tryNodalUpdate(testing_node, newSupernode());
