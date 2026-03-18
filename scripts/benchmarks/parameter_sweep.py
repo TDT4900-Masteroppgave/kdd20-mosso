@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from tabulate import tabulate
 
-from scripts.config import SWEEP_DIR, PARAM_CONFIG
+from scripts.config import PARAM_CONFIG
 from scripts.utils import format_dataframe_with_baseline
 from scripts.plotter import plot_parameter_analysis
 from scripts.benchmark import Benchmark
@@ -10,17 +10,18 @@ from scripts.benchmark import Benchmark
 
 class ParameterSweepBenchmark(Benchmark):
     def __init__(self):
-        super().__init__("sweep", SWEEP_DIR)
+        super().__init__("sweep")
         config = PARAM_CONFIG[self.args.param]
         self.sweep_values = list(range(*self.args.range)) if self.args.range else (
             self.args.values if self.args.values else config["values"])
 
+    def get_session_name(self):
+        # This names the folder dynamically: e.g., output/benchmarks/sweep/sweep_c_2026...
+        return f"sweep_{self.args.param}_{self.timestamp}"
+
     def add_custom_args(self, parser):
         parser.add_argument("--param", choices=list(PARAM_CONFIG.keys()), required=True)
         parser.add_argument("--range", type=int, nargs=3)
-
-    def get_log_prefix(self):
-        return f"sweep_{self.args.param}"
 
     def get_algo_param_display(self, p_key, default_val):
         if self.args.param == p_key:
@@ -74,10 +75,9 @@ class ParameterSweepBenchmark(Benchmark):
             self.logger.info(line)
 
     def finalize(self):
-        file_name = f"sweep_{self.args.param}_results_{self.timestamp}"
-        master_csv = os.path.join(SWEEP_DIR, f"{file_name}.csv")
+        master_csv = os.path.join(self.session_dir, "results.csv")
         pd.DataFrame(self.results).to_csv(master_csv, index=False)
-        plot_parameter_analysis(master_csv, self.args.param, os.path.join(SWEEP_DIR, f"{file_name}.pdf"))
+        plot_parameter_analysis(master_csv, self.args.param, os.path.join(self.session_dir, "parameter_plot.pdf"))
 
 
 if __name__ == "__main__":

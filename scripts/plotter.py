@@ -67,7 +67,7 @@ def plot_runs_variance(dataset_name, all_times_dict, all_ratios_dict, runs_dir):
     axes[1].legend()
 
     plt.tight_layout()
-    plt.savefig(os.path.join(runs_dir, f"{dataset_name}_variance_plot.pdf"))
+    plt.savefig(os.path.join(runs_dir, f"{dataset_name}.pdf"))
     plt.close()
 
 def plot_parameter_analysis(csv_file, param_name, plot_file):

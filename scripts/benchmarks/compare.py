@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from tabulate import tabulate
 
-from scripts.config import COMPARE_DIR, RUNS_DIR, PARAM_CONFIG
+from scripts.config import PARAM_CONFIG
 from scripts.utils import format_dataframe_with_baseline
 from scripts.plotter import plot_results, plot_runs_variance
 from scripts.benchmark import Benchmark
@@ -10,18 +10,15 @@ from scripts.benchmark import Benchmark
 
 class CompareBenchmark(Benchmark):
     def __init__(self):
-        super().__init__("compare", COMPARE_DIR)
+        super().__init__("compare")
+        self.all_times_dict, self.all_ratios_dict = {}, {}
 
     def add_custom_args(self, parser):
         parser.add_argument("--keep-summaries", action="store_true")
 
-    def get_log_prefix(self):
-        return "compare"
-
     def process(self, dataset_path: str):
         dataset_name = os.path.basename(dataset_path)
         current_result = {"Dataset": dataset_name}
-        all_times_dict, all_ratios_dict = {}, {}
 
         for algo_name, algo_config in self.active_algos.items():
             resolved_params = {}
@@ -42,11 +39,9 @@ class CompareBenchmark(Benchmark):
                 current_result[f"Ratio_{algo_name}"] = r_avg
                 self.logger.info(f"\t=> {algo_name: <12} Time: {t_avg:.3f}s | Ratio: {r_avg:.5f}")
                 if self.args.runs > 1:
-                    all_times_dict[algo_name], all_ratios_dict[algo_name] = t_list, r_list
+                    self.all_times_dict[algo_name], self.all_ratios_dict[algo_name] = t_list, r_list
 
         self.results.append(current_result)
-        if self.args.runs > 1:
-            plot_runs_variance(f"{dataset_name}_{self.timestamp}", all_times_dict, all_ratios_dict, RUNS_DIR)
 
     def print_table(self):
         df = pd.DataFrame(self.results)
@@ -62,9 +57,11 @@ class CompareBenchmark(Benchmark):
             self.logger.info(line)
 
     def finalize(self):
-        csv_file = os.path.join(self.save_dir, f"results_{self.timestamp}.csv")
+        csv_file = os.path.join(self.session_dir, "results.csv")
         pd.DataFrame(self.results).to_csv(csv_file, index=False)
-        plot_results(csv_file, os.path.join(self.save_dir, f"plot_{self.timestamp}.pdf"), self.logger)
+        plot_results(csv_file, os.path.join(self.session_dir, "compare_plot.pdf"), self.logger)
+        if self.args.runs > 1:
+            plot_runs_variance("runs_variance_plot", self.all_times_dict, self.all_ratios_dict, self.session_dir)
 
 
 if __name__ == "__main__":

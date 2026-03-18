@@ -5,18 +5,19 @@ import re
 import platform
 from abc import ABC, abstractmethod
 
-from scripts.config import VERSIONS_DIR, SUMMARIZED_DIR
+from scripts.config import VERSIONS_DIR
 from scripts.utils import get_fastutil_path, retrieve_github_code
 
 class AlgorithmRunner(ABC):
     edge_format_string = "{u}\t{v}\n"
 
     """Autonomous execution and compilation strategy for algorithms."""
-    def __init__(self, algo_name, config, logger, runs_dir):
+    def __init__(self, algo_name, config, logger, runs_dir, summaries_dir):
         self.algo_name = algo_name
         self.config = config
         self.logger = logger
         self.runs_dir = runs_dir
+        self.summaries_dir = summaries_dir
 
         self.target_dir = self.config.get("target_dir", os.path.join(VERSIONS_DIR, algo_name))
         self.is_local = self.target_dir == "."
@@ -71,7 +72,7 @@ class AlgorithmRunner(ABC):
         """Executes a single run internally resolving the correct binary path."""
         log_file_path = os.path.join(self.runs_dir, f"{output_name}.log")
 
-        graph_output_path = os.path.join(SUMMARIZED_DIR, output_name)
+        graph_output_path = os.path.join(self.summaries_dir, output_name)
 
         cmd = self.build_command(dataset_path, graph_output_path, parameters, template)
         self.logger.debug(f"Running: {' '.join(cmd)}")
@@ -157,8 +158,8 @@ class AlgorithmRunner(ABC):
 class MoSSoRunner(AlgorithmRunner):
     edge_format_string = "{u}\t{v}\t1\n"
 
-    def __init__(self, algo_name, config, logger, runs_dir):
-        super().__init__(algo_name, config, logger, runs_dir)
+    def __init__(self, algo_name, config, logger, runs_dir, summaries_dir):
+        super().__init__(algo_name, config, logger, runs_dir, summaries_dir)
         self.fastutil_path = get_fastutil_path()
 
     def get_binary_path(self):
@@ -199,6 +200,9 @@ class MoSSoRunner(AlgorithmRunner):
 
 
 class MagsRunner(AlgorithmRunner):
+    def __init__(self, algo_name, config, logger, runs_dir, summaries_dir):
+        super().__init__(algo_name, config, logger, runs_dir, summaries_dir)
+
     def get_binary_path(self):
         binary_file = self.config.get('binary_file', self.algo_name)
 
@@ -319,11 +323,9 @@ endif()
             cmd.append(str(parameters.get(param_key, "")))
         return cmd
 
-def get_runner(algo_name, config, logger, runs_dir):
-    """Instantiates the correct runner based on the config's language tag."""
+def get_runner(algo_name, config, logger, runs_dir, summaries_dir):
     if config.get("type") == "mags":
-        return MagsRunner(algo_name, config, logger, runs_dir)
+        return MagsRunner(algo_name, config, logger, runs_dir, summaries_dir)
     elif config.get("type") == "mosso":
-        return MoSSoRunner(algo_name, config, logger, runs_dir)
-
+        return MoSSoRunner(algo_name, config, logger, runs_dir, summaries_dir)
     return None

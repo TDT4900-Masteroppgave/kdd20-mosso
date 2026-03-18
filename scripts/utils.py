@@ -8,8 +8,6 @@ import pandas as pd
 from scripts.config import *
 import logging
 import sys
-from datetime import datetime
-from scripts.config import LOG_DIR, RUNS_DIR, SUMMARIZED_DIR
 
 def get_fastutil_path():
     fastutil_files = glob.glob("fastutil-*.jar")
@@ -17,8 +15,9 @@ def get_fastutil_path():
 
 
 def setup_directories():
-    for d in [DATASETS_DIR, OUTPUT_DIR, COMPARE_DIR, RUNS_DIR, SUMMARIZED_DIR, SWEEP_DIR, LOG_DIR, VERSIONS_DIR]:
+    for d in [DATASETS_DIR, OUTPUT_DIR, BENCHMARK_DIR, VERSIONS_DIR]:
         os.makedirs(d, exist_ok=True)
+
 
 def retrieve_github_code(target_dir: str, algo_name: str, repo_url: str, branch: str, logger):
     try:
@@ -27,7 +26,7 @@ def retrieve_github_code(target_dir: str, algo_name: str, repo_url: str, branch:
             logger.info(f"\t\t[*] Cloning {repo_url}")
 
             subprocess.run(["git", "clone", "-q", "--branch", branch, "--single-branch", repo_url, target_dir],
-                            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         else:
             logger.info(f"\t\t[*] Directory for {algo_name} already exist")
             logger.info(f"\t\t[*] Pulling {repo_url}")
@@ -35,6 +34,7 @@ def retrieve_github_code(target_dir: str, algo_name: str, repo_url: str, branch:
                            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     except subprocess.CalledProcessError as e:
         raise e
+
 
 def prepare_dataset(filepath, logger):
     filename = os.path.basename(filepath)
@@ -94,22 +94,16 @@ def download_and_prepare_dataset(url, filename, logger):
     return txt_path
 
 
-def setup_logging(run_type):
-    os.makedirs(LOG_DIR, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # The unique ID
-    log_file = os.path.join(LOG_DIR, f"{run_type}_{timestamp}.log")
-
-    logger = logging.getLogger("MoSSo")
+def setup_logging(log_file_path):
+    logger = logging.getLogger("Benchmark")
     logger.setLevel(logging.DEBUG)
     logger.handlers = []
 
-    # Console Handler: Clean, concise output
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.INFO)
     ch.setFormatter(logging.Formatter('%(message)s'))
 
-    # File Handler: Verbose output for debugging
-    fh = logging.FileHandler(log_file)
+    fh = logging.FileHandler(log_file_path)
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
@@ -125,7 +119,8 @@ def setup_logging(run_type):
 
     sys.excepthook = handle_exception
 
-    return logger, timestamp
+    return logger
+
 
 def format_dataframe_with_baseline(df, strategies, baseline_algo=None):
     """Helper function to calculate inline relative performance factors."""
@@ -162,6 +157,7 @@ def format_dataframe_with_baseline(df, strategies, baseline_algo=None):
         display_df[ratio_col] = formatted_ratios
 
     return display_df
+
 
 def get_datasets_to_run(args):
     """Deciding which datasets to process."""

@@ -42,7 +42,7 @@ case $TYPE in
     sweep)
         python3 -m scripts.benchmarks.parameter_sweep "$@"
         ;;
-    latin)
+    lhs)
         python3 -m scripts.benchmarks.latin_hypercube "$@"
         ;;
     *)

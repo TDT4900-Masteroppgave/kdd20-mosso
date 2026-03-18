@@ -2,14 +2,8 @@ import os
 
 OUTPUT_DIR = "output"
 DATASETS_DIR = "datasets"
-
 BENCHMARK_DIR = os.path.join(OUTPUT_DIR, "benchmarks")
 VERSIONS_DIR = os.path.join(BENCHMARK_DIR, "versions")
-COMPARE_DIR = os.path.join(BENCHMARK_DIR, "compare")
-RUNS_DIR = os.path.join(COMPARE_DIR, "runs")
-SUMMARIZED_DIR = os.path.join(COMPARE_DIR, "summarized_graphs")
-SWEEP_DIR = os.path.join(BENCHMARK_DIR, "parameter_sweep")
-LOG_DIR = os.path.join(BENCHMARK_DIR, "logs")
 
 BASE_REPO_URL = "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git"
 

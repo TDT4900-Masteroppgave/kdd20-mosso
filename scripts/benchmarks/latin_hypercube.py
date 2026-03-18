@@ -11,14 +11,10 @@ LHS_DIR = os.path.join(OUTPUT_DIR, "lhs_optimization")
 
 class LHSBenchmark(Benchmark):
     def __init__(self):
-        super().__init__("lhs", LHS_DIR)
-        os.makedirs(LHS_DIR, exist_ok=True)
+        super().__init__("lhs")
 
     def add_custom_args(self, parser):
         parser.add_argument("--samples", type=int, default=30, help="Number of LHS configurations to test")
-
-    def get_log_prefix(self):
-        return "lhs_opt"
 
     def get_algo_param_display(self, p_key, default_val):
         bounds = PARAM_CONFIG.get(p_key, {}).get('bounds')
@@ -103,9 +99,9 @@ class LHSBenchmark(Benchmark):
             self.logger.info(line)
 
     def finalize(self):
-        master_csv = os.path.join(self.save_dir, f"lhs_results_{self.timestamp}.csv")
-        pd.DataFrame(self.results).to_csv(master_csv, index=False)
-        plot_pareto_front(master_csv, os.path.join(self.save_dir, f"lhs_plot_{self.timestamp}.pdf"))
+        csv_file = os.path.join(self.session_dir, f"lhs_results_{self.timestamp}.csv")
+        pd.DataFrame(self.results).to_csv(csv_file, index=False)
+        plot_pareto_front(csv_file, os.path.join(self.session_dir, f"lhs_plot_{self.timestamp}.pdf"))
 
 if __name__ == "__main__":
     LHSBenchmark().run()

@@ -1,13 +1,14 @@
+import os
 from abc import ABC, abstractmethod
+from datetime import datetime
 
-from scripts.config import PARAM_CONFIG, ALGORITHMS, DATASETS, RUNS_DIR
+from scripts.config import PARAM_CONFIG, ALGORITHMS, DATASETS, BENCHMARK_DIR
 from scripts.utils import setup_logging, setup_directories, get_datasets_to_run, download_and_prepare_dataset
 from scripts.runners import get_runner
 import argparse
 
 class Benchmark(ABC):
-    def __init__(self, benchmark_type, save_dir):
-        self.save_dir = save_dir
+    def __init__(self, benchmark_type):
         self.benchmark_type = benchmark_type
         self.results = []
         self.datasets_to_run = None
@@ -15,8 +16,21 @@ class Benchmark(ABC):
         self.args = None
         self._parse_arguments()
 
-        self.log_prefix = self.get_log_prefix()
-        self.logger, self.timestamp = setup_logging(self.log_prefix)
+        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.session_dir = os.path.join(BENCHMARK_DIR, self.benchmark_type, self.get_session_name())
+        self.runs_dir = os.path.join(self.session_dir, "runs")
+        self.summaries_dir = os.path.join(self.session_dir, "summarized_graphs")
+
+        os.makedirs(self.session_dir, exist_ok=True)
+        os.makedirs(self.runs_dir, exist_ok=True)
+        os.makedirs(self.summaries_dir, exist_ok=True)
+
+        log_file = os.path.join(self.session_dir, "execution.log")
+        self.logger = setup_logging(log_file)
+
+    def get_session_name(self):
+        """Hook to allow subclasses to name the folder (e.g., sweep_c_2026...)"""
+        return f"run_{self.timestamp}"
 
     def _parse_arguments(self):
         """Builds the parser, collects custom args, and parses them."""
@@ -51,11 +65,6 @@ class Benchmark(ABC):
         pass
 
     @abstractmethod
-    def get_log_prefix(self):
-        """Returns the log prefix for the benchmark."""
-        pass
-
-    @abstractmethod
     def process(self, dataset_path: str):
         """Logic for running the benchmark."""
         pass
@@ -65,9 +74,14 @@ class Benchmark(ABC):
         """Logic for saving artifacts."""
         pass
 
+    @abstractmethod
+    def print_table(self):
+        """Logic for formatting and printing the results table to the console."""
+        pass
+
     def execute_runner(self, algo_name, algo_config, dataset_path, dataset_name, resolved_params):
         """A helper method to standardize runner execution across subclasses."""
-        runner = get_runner(algo_name, algo_config, self.logger, RUNS_DIR)
+        runner = get_runner(algo_name, algo_config, self.logger, self.runs_dir, self.summaries_dir)
         if not runner.binary_exists():
             self.logger.warning(f"[!] Binary not found for {algo_name}. Skipping.")
             return None, None, None, None
@@ -82,20 +96,16 @@ class Benchmark(ABC):
             template=template
         )
 
-    @abstractmethod
-    def print_table(self):
-        """Logic for formatting and printing the results table to the console."""
-        pass
-
     def setup(self):
         self.datasets_to_run = get_datasets_to_run(self.args)
         setup_directories()
 
+        self.logger.info(f"[*] Session Directory Created: {self.session_dir}")
         self.logger.info("[*] Compiling configured algorithms...")
 
         for algo_name, config in self.active_algos.items():
             self.logger.info(f"\tBuilding {algo_name}")
-            runner = get_runner(algo_name, config, self.logger, RUNS_DIR)
+            runner = get_runner(algo_name, config, self.logger, self.runs_dir, self.summaries_dir)
             runner.build()
 
     def get_algo_param_display(self, p_key, default_val):
@@ -160,7 +170,7 @@ class Benchmark(ABC):
             try:
                 self.print_table()
                 self.finalize()
-                self.logger.info(f"[*] Artifacts saved to: {self.save_dir}")
+                self.logger.info(f"[*] Artifacts saved to: {self.session_dir}")
             except Exception as e:
                 self.logger.error(f"[!] Error during table printing or plotting: {e}")
                 # Ultimate fallback: Just dump the raw dictionaries so data isn't lost
