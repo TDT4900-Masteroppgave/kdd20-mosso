@@ -223,14 +223,6 @@ class MagsRunner(AlgorithmRunner):
 
         return time_m, ratio_m
 
-    class MagsRunner(AlgorithmRunner):
-        def get_binary_path(self):
-            binary_file = self.config.get('binary_file', self.algo_name)
-            # Windows requires .exe extension for compiled C++ binaries
-            if platform.system() == "Windows" and not binary_file.endswith(".exe"):
-                binary_file += ".exe"
-            return os.path.join(self.target_dir, binary_file)
-
     def compile_logic(self):
         build_dir = os.path.join(self.target_dir, "build")
         os.makedirs(build_dir, exist_ok=True)
