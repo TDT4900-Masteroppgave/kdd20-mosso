@@ -16,7 +16,7 @@ BASE_REPO_URL = "https://github.com/TDT4900-Masteroppgave/mosso-mags-dm.git"
 PARAM_CONFIG = {
     "c": {"description": "sample number", "default": 120, "bounds": (10, 240)},
     "e": {"description": "escape", "default": 3, "bounds": (1, 9)},
-    "interval": {"description": "interval", "default": 1000, "bounds": (1000, 1000)},
+    "interval": {"description": "interval", "default": 1000},
     "b": {"description": "top candidates", "default": 5, "bounds": (1, 10)},
     "h": {"description": "hashes", "default": 4, "bounds": (4, 40)}
 }
@@ -24,49 +24,49 @@ PARAM_CONFIG = {
 ALGORITHMS = {
     "local": {
         "target_dir": ".",
-        "lang": "java",
+        "type": "mosso",
         "template": ["e", "c", "interval"]
     },
     "kdd20-mosso": {
         "repo": "https://github.com/jihoonko/kdd20-mosso.git",
         "branch": "master",
         "params" : {"c": 120, "e": 3},
-        "lang": "java",
+        "type": "mosso",
         "template": ["e", "c", "interval"],
         "binary_file": "kdd20-mosso.jar"
     },
     "strat_1": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1",
-        "lang": "java",
+        "type": "mosso",
         "template": ["e", "c", "interval"],
         "binary_file": "mosso-strat_1.jar",
     },
     "strat_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_2",
-        "lang": "java",
+        "type": "mosso",
         "template": ["e", "c", "interval", "h"],
         "binary_file": "mosso-strat_2.jar",
     },
     "strat_1_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1_2",
-        "lang": "java",
+        "type": "mosso",
         "template": ["e", "c", "interval", "b"],
         "binary_file": "mosso-strat_2.jar",
     },
     "mags": {
         "repo": "https://github.com/nedchu/mags-release",
         "branch": "main",
-        "lang": "cpp",
+        "type": "mags",
         "template": [],
         "binary_file": "mags",
     },
     "mags-dm": {
         "repo": "https://github.com/nedchu/mags-release",
         "branch": "main",
-        "lang": "cpp",
+        "type": "mags",
         "template": [],
         "binary_file": "mags_dm",
     },

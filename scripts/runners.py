@@ -321,9 +321,9 @@ endif()
 
 def get_runner(algo_name, config, logger, runs_dir):
     """Instantiates the correct runner based on the config's language tag."""
-    if config.get("lang", "java") == "cpp":
+    if config.get("type") == "mags":
         return MagsRunner(algo_name, config, logger, runs_dir)
-    elif config.get("lang", "java") == "java":
+    elif config.get("type") == "mosso":
         return MoSSoRunner(algo_name, config, logger, runs_dir)
 
     return None
