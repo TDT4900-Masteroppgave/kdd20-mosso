@@ -76,7 +76,23 @@ class ParameterSweepBenchmark(Benchmark):
 
     def finalize(self):
         master_csv = os.path.join(self.session_dir, "results.csv")
-        pd.DataFrame(self.results).to_csv(master_csv, index=False)
+        df = pd.DataFrame(self.results)
+        df.to_csv(master_csv, index=False)
+
+        strategies = [col.replace("Time_", "") for col in df.columns if col.startswith("Time_")]
+
+        table_str = f"--- SWEEP LOG ({self.args.param.upper()}) ---\n"
+        display_df = format_dataframe_with_baseline(df, strategies, self.args.baseline)
+        table_str += tabulate(display_df, headers='keys', tablefmt='grid', showindex=False)
+
+        avg_df = df.groupby(self.args.param).mean(numeric_only=True).reset_index()
+        display_avg = format_dataframe_with_baseline(avg_df, strategies, self.args.baseline)
+        table_str += f"\n\n--- AVERAGES BY {self.args.param.upper()} ---\n"
+        table_str += tabulate(display_avg, headers='keys', tablefmt='grid', showindex=False)
+
+        with open(os.path.join(self.session_dir, "table_results.txt"), "w") as f:
+            f.write(table_str)
+
         plot_parameter_analysis(master_csv, self.args.param, os.path.join(self.session_dir, "parameter_plot.pdf"))
 
 

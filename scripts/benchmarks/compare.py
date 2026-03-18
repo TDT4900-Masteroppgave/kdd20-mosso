@@ -58,7 +58,19 @@ class CompareBenchmark(Benchmark):
 
     def finalize(self):
         csv_file = os.path.join(self.session_dir, "results.csv")
-        pd.DataFrame(self.results).to_csv(csv_file, index=False)
+        df = pd.DataFrame(self.results)
+        df.to_csv(csv_file, index=False)
+
+        strategies = [col.replace("Time_", "") for col in df.columns if col.startswith("Time_")]
+        avg_row = df.mean(numeric_only=True).to_dict()
+        avg_row['Dataset'] = 'AVERAGE'
+        table_df = pd.concat([df, pd.DataFrame([avg_row])], ignore_index=True)
+        display_df = format_dataframe_with_baseline(table_df, strategies, self.args.baseline)
+        table_str = tabulate(display_df, headers='keys', tablefmt='grid', showindex=False)
+
+        with open(os.path.join(self.session_dir, "table_results.txt"), "w") as f:
+            f.write(table_str)
+
         plot_results(csv_file, os.path.join(self.session_dir, "compare_plot.pdf"), self.logger)
         if self.args.runs > 1:
             plot_runs_variance("runs_variance_plot", self.all_times_dict, self.all_ratios_dict, self.session_dir)
