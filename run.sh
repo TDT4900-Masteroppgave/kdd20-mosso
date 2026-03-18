@@ -45,8 +45,8 @@ case $TYPE in
     lhs)
         python3 -m scripts.benchmarks.latin_hypercube "$@"
         ;;
-    baysian)
-      python3 -m scripts.benchmarks.baysian_opt "$@"
+    bayesian)
+      python3 -m scripts.benchmarks.bayesian_opt "$@"
         ;;
     *)
         echo "Usage: ./run.sh --type {compare|sweep|latin} [options]"
