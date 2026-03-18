@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from scripts.config import PARAM_CONFIG, ALGORITHMS, DATASETS, RUNS_DIR
-from scripts.utils import setup_logging, setup_directories, get_datasets_to_run
+from scripts.utils import setup_logging, setup_directories, get_datasets_to_run, download_and_prepare_dataset
 from scripts.runners import get_runner
 import argparse
 
@@ -56,7 +56,7 @@ class Benchmark(ABC):
         pass
 
     @abstractmethod
-    def process(self):
+    def process(self, dataset_path: str):
         """Logic for running the benchmark."""
         pass
 
@@ -64,6 +64,23 @@ class Benchmark(ABC):
     def finalize(self):
         """Logic for saving artifacts."""
         pass
+
+    def execute_runner(self, algo_name, algo_config, dataset_path, dataset_name, resolved_params):
+        """A helper method to standardize runner execution across subclasses."""
+        runner = get_runner(algo_name, algo_config, self.logger, RUNS_DIR)
+        if not runner.binary_exists():
+            self.logger.warning(f"[!] Binary not found for {algo_name}. Skipping.")
+            return None, None, None, None
+
+        template = algo_config.get('template', [])
+
+        return runner.run_multiple(
+            dataset_path=dataset_path,
+            base_output_name=f"{algo_name}_{dataset_name}_{self.timestamp}",
+            runs=self.args.runs,
+            parameters=resolved_params,
+            template=template
+        )
 
     @abstractmethod
     def print_table(self):
@@ -73,7 +90,6 @@ class Benchmark(ABC):
     def setup(self):
         self.datasets_to_run = get_datasets_to_run(self.args)
         setup_directories()
-
 
         self.logger.info("[*] Compiling configured algorithms...")
 
@@ -111,7 +127,7 @@ class Benchmark(ABC):
 
     def run(self):
         """The main execution lifecycle."""
-        self.logger.info("=" * 10 + f"{' STAGE 1: SETUP & COMPILATION ':^30}" + "=" * 10)
+        self.logger.info("=" * 10 + f"{' STAGE 1: SETUP ':^30}" + "=" * 10)
         try:
             self.setup()
 
@@ -127,7 +143,14 @@ class Benchmark(ABC):
 
         self.logger.info("=" * 10 + f"{' STAGE 2: PROCESSING ':^30}" + "=" * 10)
         try:
-            self.process()
+            for i, (url, filename) in enumerate(self.datasets_to_run, 1):
+                dataset_name = filename.replace(".txt", "").replace(".csv", "")
+                dataset_path = download_and_prepare_dataset(url, filename, self.logger)
+                if not dataset_path:
+                    raise RuntimeError(f"Failed to download dataset {filename}.")
+
+                self.logger.info(f"[{i}/{len(self.datasets_to_run)}] Benchmarking [{dataset_name}] ({self.args.runs} runs) ...")
+                self.process(dataset_path)
         except RuntimeError as e:
             self.logger.error(f"[!] Processing aborted: {e}")
             return

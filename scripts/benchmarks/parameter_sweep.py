@@ -3,9 +3,10 @@ import pandas as pd
 from tabulate import tabulate
 
 from scripts.config import SWEEP_DIR, PARAM_CONFIG
-from scripts.utils import download_and_prepare_dataset, prepare_dataset, format_dataframe_with_baseline, run_multiple
+from scripts.utils import format_dataframe_with_baseline
 from scripts.plotter import plot_parameter_analysis
 from scripts.benchmark import Benchmark
+
 
 class ParameterSweepBenchmark(Benchmark):
     def __init__(self):
@@ -27,45 +28,33 @@ class ParameterSweepBenchmark(Benchmark):
             return f"SWEEPING {range_str}"
         return default_val
 
-    def process(self):
-        results = []
+    def process(self, dataset_path: str):
+        dataset_name = os.path.basename(dataset_path)
         for val in self.sweep_values:
             self.logger.info(f"--- Testing {self.args.param.upper()} = {val} ---")
+            current_result = {"Dataset": dataset_name, self.args.param: val}
 
-            for i, (url, filename) in enumerate(self.datasets_to_run, 1):
-                dataset_name = filename.replace(".txt", "").replace(".csv", "")
-                path = prepare_dataset(filename, self.logger) if url == "local" else download_and_prepare_dataset(url,
-                                                                                                             filename,
-                                                                                                             self.logger)
-                if not path: continue
+            for algo_name, algo_config in self.active_algos.items():
+                params = algo_config.get('params', {})
+                resolved_params = {
+                    "interval": params.get('interval', self.args.interval)
+                }
+                for p_key in PARAM_CONFIG.keys():
+                    current_fallback = val if self.args.param == p_key else getattr(self.args, p_key)
+                    resolved_params[p_key] = params.get(p_key, current_fallback)
 
-                self.logger.info(f"[{i}/{len(self.datasets_to_run)}] Running {dataset_name} ({self.args.runs} runs) ...")
-                current_result = {"Dataset": dataset_name, self.args.param: val}
+                t, r, _, _ = self.execute_runner(
+                    algo_name=algo_name,
+                    algo_config=algo_config,
+                    dataset_path=dataset_path,
+                    dataset_name=dataset_name,
+                    resolved_params=resolved_params
+                )
+                if t is not None:
+                    current_result[f"Time_{algo_name}"], current_result[f"Ratio_{algo_name}"] = t, r
+                    self.logger.info(f"\t=> {algo_name: <12} Time: {t:.3f}s | Ratio: {r:.5f}")
 
-                for algo_name, config in self.active_algos.items():
-                    binary_file = config.get('binary_file')
-                    if not os.path.exists(binary_file): continue
-
-                    template = config.get('template', [])
-                    params = config.get('params', {})
-
-                    resolved_params = {
-                        "interval": params.get('interval', self.args.interval)
-                    }
-                    for p_key in PARAM_CONFIG.keys():
-                        current_fallback = val if self.args.param == p_key else getattr(self.args, p_key)
-                        resolved_params[p_key] = params.get(p_key, current_fallback)
-
-                    t, r, _, _ = run_multiple(
-                        binary_file, path, f"{algo_name}_{dataset_name}_{self.args.param}{val}_{self.timestamp}",
-                        self.args.runs, True, self.logger, resolved_params, template)
-
-                    if t is not None:
-                        current_result[f"Time_{algo_name}"], current_result[f"Ratio_{algo_name}"] = t, r
-                        self.logger.info(f"\t=> {algo_name: <12} Time: {t:.3f}s | Ratio: {r:.5f}")
-
-                results.append(current_result)
-        self.results = results
+            self.results.append(current_result)
 
     def print_table(self):
         df = pd.DataFrame(self.results)
