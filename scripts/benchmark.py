@@ -142,8 +142,8 @@ class Benchmark(ABC):
             return
 
         self.logger.info("=" * 10 + f"{' STAGE 2: PROCESSING ':^30}" + "=" * 10)
-        try:
-            for i, (url, filename) in enumerate(self.datasets_to_run, 1):
+        for i, (url, filename) in enumerate(self.datasets_to_run, 1):
+            try:
                 dataset_name = filename.replace(".txt", "").replace(".csv", "")
                 dataset_path = download_and_prepare_dataset(url, filename, self.logger)
                 if not dataset_path:
@@ -151,14 +151,23 @@ class Benchmark(ABC):
 
                 self.logger.info(f"[{i}/{len(self.datasets_to_run)}] Benchmarking [{dataset_name}] ({self.args.runs} runs) ...")
                 self.process(dataset_path)
-        except RuntimeError as e:
-            self.logger.error(f"[!] Processing aborted: {e}")
-            return
+            except Exception as e:
+                self.logger.error(f"[!] Processing aborted: {e}")
+                continue
 
-        if self.results and len(self.results[0]) > 1:
+        if self.results and len(self.results) > 0:
             self.logger.info("=" * 10 + f"{' STAGE 3: RESULTS & ARTIFACTS ':^30}" + "=" * 10)
-            self.print_table()
-            self.finalize()
-            self.logger.info(f"[*] Artifacts saved to: {self.save_dir}")
+            try:
+                self.print_table()
+                self.finalize()
+                self.logger.info(f"[*] Artifacts saved to: {self.save_dir}")
+            except Exception as e:
+                self.logger.error(f"[!] Error during table printing or plotting: {e}")
+                # Ultimate fallback: Just dump the raw dictionaries so data isn't lost
+                import json
+                fallback_path = f"EMERGENCY_DUMP_{self.timestamp}.json"
+                with open(fallback_path, "w") as f:
+                    json.dump(self.results, f, indent=4)
+                self.logger.warning(f"[*] Saved raw fallback data to {fallback_path}")
         else:
-            self.logger.warning("[!] No results generated.")
+            self.logger.warning("[!] No results generated. Nothing to save.")
