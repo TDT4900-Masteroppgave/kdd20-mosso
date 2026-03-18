@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from tabulate import tabulate
+import numpy as np
 
 from scripts.config import PARAM_CONFIG
 from scripts.utils import format_dataframe_with_baseline
@@ -35,11 +36,20 @@ class CompareBenchmark(Benchmark):
             )
 
             if t_avg is not None:
+                t_std = np.std(t_list) if len(t_list) > 1 else 0.0
+                r_std = np.std(r_list) if len(r_list) > 1 else 0.0
+
                 current_result[f"Time_{algo_name}"] = t_avg
                 current_result[f"Ratio_{algo_name}"] = r_avg
-                self.logger.info(f"\t=> {algo_name: <12} Time: {t_avg:.3f}s | Ratio: {r_avg:.5f}")
+                current_result[f"Time_std_{algo_name}"] = t_std
+                current_result[f"Ratio_std_{algo_name}"] = r_std
+
+                # Update the console logger to show the ± symbol
                 if self.args.runs > 1:
+                    self.logger.info(f"\t=> {algo_name: <12} Time: {t_avg:.3f}s ± {t_std:.3f}s | Ratio: {r_avg:.5f} ± {r_std:.5f}")
                     self.all_times_dict[algo_name], self.all_ratios_dict[algo_name] = t_list, r_list
+                else:
+                    self.logger.info(f"\t=> {algo_name: <12} Time: {t_avg:.3f}s | Ratio: {r_avg:.5f}")
 
         self.results.append(current_result)
 

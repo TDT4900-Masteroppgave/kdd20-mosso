@@ -101,6 +101,7 @@ class AlgorithmRunner(ABC):
 
         except Exception as e:
             self.logger.error(f"Execution failed for {output_name}: {e}")
+            self.logger.debug(f"[!] Command was: {' '.join(cmd)}")
             return None, None
 
     def format_dataset(self, original_dataset_path: str) -> str:
@@ -141,6 +142,10 @@ class AlgorithmRunner(ABC):
 
     def run_multiple(self, dataset_path, base_output_name, runs, parameters, template, keep_summaries=False):
         format_dataset_path = self.format_dataset(dataset_path)
+
+        if runs > 1:
+            self.logger.info(f"\t[*] Executing Warmup Run for {self.algo_name}...")
+            self.run_single(format_dataset_path, f"{base_output_name}_warmup", parameters, template, keep_summaries=False)
 
         times, ratios = [], []
         for i in range(runs):
@@ -262,10 +267,8 @@ class MagsRunner(AlgorithmRunner):
                 with open(pgsum_path, "w", encoding="utf-8") as f:
                     f.write(content.replace("#pragma omp barier", "#pragma omp barrier"))
 
-        # --- THE NUCLEAR OPTION: Dynamically Generate a Modern CMakeLists.txt ---
         binary_file = self.config.get('binary_file', self.algo_name)
 
-        # Dynamically map to run/run_mags.cpp or run/run_mags_dm.cpp
         run_file = f"run/run_{binary_file}.cpp"
 
         cmake_content = f"""
@@ -297,13 +300,10 @@ endif()
         with open(cmake_path, "w", encoding="utf-8") as f:
             f.write(cmake_content.strip() + "\n")
 
-        # 1. Platform-Agnostic CMake Configuration
         subprocess.run(["cmake", "..", "-DCMAKE_BUILD_TYPE=Release"], cwd=build_dir, env=env, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-        # 2. Platform-Agnostic Build (Replaces "make")
         subprocess.run(["cmake", "--build", ".", "--config", "Release"], cwd=build_dir, env=env, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-        # 3. Locate the binary (Windows MSVC puts it in a Release/ subfolder, Unix leaves it in build/)
         binary_name = os.path.basename(self.get_binary_path())
         compiled_binary_unix = os.path.join(build_dir, binary_name)
         compiled_binary_win = os.path.join(build_dir, "Release", binary_name)

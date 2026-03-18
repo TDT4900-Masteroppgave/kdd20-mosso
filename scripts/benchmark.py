@@ -2,6 +2,8 @@ import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+from tabulate import tabulate
+
 from scripts.config import PARAM_CONFIG, ALGORITHMS, DATASETS, BENCHMARK_DIR
 from scripts.utils import setup_logging, setup_directories, get_datasets_to_run, download_and_prepare_dataset
 from scripts.runners import get_runner
@@ -113,43 +115,41 @@ class Benchmark(ABC):
         return default_val
 
     def print_parameters(self):
-        for arg_key, arg_val in vars(self.args).items():
-            if arg_key not in PARAM_CONFIG:
-                self.logger.info(" "*4 + f"- {arg_key}: {arg_val}")
+        general_args = [[k, v] for k, v in vars(self.args).items() if k not in PARAM_CONFIG]
+        self.logger.info("\n[*] General Parameters:")
+        self.logger.info(tabulate(general_args, headers=["Argument", "Value"], tablefmt="simple"))
 
         for algo_name, algo_config in self.active_algos.items():
-            self.logger.info(f"[*] Hyperparameters for {algo_name}: ")
             template = algo_config.get('template', [])
             params = algo_config.get('params', {})
 
-            if not template:
-                self.logger.info(" "*4 + "(No template defined)")
-                continue
-
+            algo_data = []
             for p_key in template:
                 if p_key in params:
-                    val = params[p_key]
-                    self.logger.info(" "*4 + f"- {p_key}: {val} (FIXED)")
+                    algo_data.append([p_key, params[p_key], "FIXED"])
                 else:
                     base_val = getattr(self.args, p_key, "N/A")
                     display_val = self.get_algo_param_display(p_key, base_val)
-                    self.logger.info(" "*4 + f"- {p_key}: {display_val}")
+                    algo_data.append([p_key, display_val, "DYNAMIC"])
+
+            if algo_data:
+                self.logger.info(f"\n[*] Hyperparameters: {algo_name}")
+                self.logger.info(tabulate(algo_data, headers=["Param", "Value", "State"], tablefmt="simple"))
+
+        self.logger.info(f"[*] Datasets to Run ({len(self.datasets_to_run)}):")
+        for url, filename in self.datasets_to_run:
+            self.logger.info(f" "*4 + f"- {filename}")
 
     def run(self):
         """The main execution lifecycle."""
         self.logger.info("=" * 10 + f"{' STAGE 1: SETUP ':^30}" + "=" * 10)
         try:
             self.setup()
-
-            self.logger.info("[*] Parameters:")
-            self.print_parameters()
-
-            self.logger.info(f"[*] Datasets to Run ({len(self.datasets_to_run)}):")
-            for url, filename in self.datasets_to_run:
-                self.logger.info(f" "*4 + f"- {filename}")
         except Exception as e:
             self.logger.error(f"[!] Setup aborted: {e}")
             return
+
+        self.print_parameters()
 
         self.logger.info("=" * 10 + f"{' STAGE 2: PROCESSING ':^30}" + "=" * 10)
         for i, (url, filename) in enumerate(self.datasets_to_run, 1):

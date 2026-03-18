@@ -36,39 +36,6 @@ def retrieve_github_code(target_dir: str, algo_name: str, repo_url: str, branch:
         raise e
 
 
-def prepare_dataset(filepath, logger):
-    filename = os.path.basename(filepath)
-    prepared_path = os.path.join(DATASETS_DIR, f"prepared_{filename}")
-    if os.path.exists(prepared_path):
-        return prepared_path
-
-    logger.debug(f"Cleaning {filename} (Undirected, No Self-Loops, No Multi-Edges)...")
-    seen_edges = set()
-
-    try:
-        with open(filepath, 'r') as f_in, open(prepared_path, 'w') as f_out:
-            for line in f_in:
-                if line.startswith('#'): continue
-                parts = line.strip().split()
-                if len(parts) >= 2:
-                    try:
-                        u, v = int(parts[0]), int(parts[1])
-                        if u == v: continue
-                        edge = tuple(sorted((u, v)))
-                        if edge in seen_edges: continue
-                        seen_edges.add(edge)
-                        f_out.write(f"{u}\t{v}\t1\n")
-                    except ValueError:
-                        continue
-        return prepared_path
-
-    except Exception as e:
-        logger.error(f"[!] Failed to prepare local dataset {filename}: {e}")
-        if os.path.exists(prepared_path):
-            os.remove(prepared_path)
-        return None
-
-
 def download_and_prepare_dataset(url, filename, logger):
     gz_path = os.path.join(DATASETS_DIR, filename + ".gz")
     txt_path = os.path.join(DATASETS_DIR, filename)
@@ -123,15 +90,29 @@ def setup_logging(log_file_path):
 
 
 def format_dataframe_with_baseline(df, strategies, baseline_algo=None):
-    """Helper function to calculate inline relative performance factors."""
+    """Helper function to calculate inline relative performance factors and variance."""
     display_df = df.copy()
 
     for strat in strategies:
         time_col, ratio_col = f"Time_{strat}", f"Ratio_{strat}"
+        t_std_col, r_std_col = f"Time_std_{strat}", f"Ratio_std_{strat}"
+
         formatted_times, formatted_ratios = [], []
 
         for _, row in df.iterrows():
             t_val, r_val = row.get(time_col), row.get(ratio_col)
+            t_std = row.get(t_std_col, 0.0)
+            r_std = row.get(r_std_col, 0.0)
+
+            if pd.notna(t_val):
+                t_str = f"{t_val:.3f}s ± {t_std:.3f}s" if t_std > 0 else f"{t_val:.3f}s"
+            else:
+                t_str = "N/A"
+
+            if pd.notna(r_val):
+                r_str = f"{r_val:.5f} ± {r_std:.5f}" if r_std > 0 else f"{r_val:.5f}"
+            else:
+                r_str = "N/A"
 
             if baseline_algo and baseline_algo in strategies and strat != baseline_algo:
                 t_base = row.get(f"Time_{baseline_algo}")
@@ -139,22 +120,20 @@ def format_dataframe_with_baseline(df, strategies, baseline_algo=None):
 
                 if pd.notna(t_val) and pd.notna(t_base) and t_val > 0:
                     speedup = t_base / t_val
-                    formatted_times.append(f"{t_val:.3f}s ({speedup:.2f}x)")
-                else:
-                    formatted_times.append(f"{t_val:.3f}s" if pd.notna(t_val) else "N/A")
+                    t_str += f" ({speedup:.2f}x)"
 
                 if pd.notna(r_val) and pd.notna(r_base) and r_base > 0:
                     ratio_mult = r_val / r_base
-                    formatted_ratios.append(f"{r_val:.5f} ({ratio_mult:.2f}x)")
-                else:
-                    formatted_ratios.append(f"{r_val:.5f}" if pd.notna(r_val) else "N/A")
+                    r_str += f" ({ratio_mult:.2f}x)"
 
-            else:
-                formatted_times.append(f"{t_val:.3f}s" if pd.notna(t_val) else "N/A")
-                formatted_ratios.append(f"{r_val:.5f}" if pd.notna(r_val) else "N/A")
+            formatted_times.append(t_str)
+            formatted_ratios.append(r_str)
 
         display_df[time_col] = formatted_times
         display_df[ratio_col] = formatted_ratios
+
+    std_cols_to_drop = [c for c in display_df.columns if "_std_" in c]
+    display_df = display_df.drop(columns=std_cols_to_drop)
 
     return display_df
 
