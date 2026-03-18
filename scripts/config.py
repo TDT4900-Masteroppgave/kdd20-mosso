@@ -35,6 +35,11 @@ ALGORITHMS = {
         "branch": "feature/merging_strategy_2",
         "template": ["escape", "samples", "interval"]
     },
+    "strat_2_prob_similarity": {
+        "repo": BASE_REPO_URL,
+        "branch": "feature/prob_selection_similarity",
+        "template": ["escape", "samples", "interval"]
+    },
     "strat_1_2": {
         "repo": BASE_REPO_URL,
         "branch": "feature/merging_strategy_1_2",
