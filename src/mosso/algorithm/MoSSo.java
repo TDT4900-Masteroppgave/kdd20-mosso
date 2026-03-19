@@ -417,14 +417,14 @@ public class MoSSo extends SupernodeHelper {
                 }
             }
 
-            tryNodalUpdate(testing_node, V.getInt(target));
 
-            // // Proceed with MoSSo's original update logic using the newly found best target
-            // if (randInt(1, 10) > escape || iteration < 1000) {
-            // } else {
-            //     // only if the supernode containing nbd is not singleton
-            //     if(getSize(V.getInt(testing_node)) > 1) tryNodalUpdate(testing_node, newSupernode());
-            // }
+            // Proceed with MoSSo's original update logic using the newly found best target
+            if (randInt(1, 10) > escape || iteration < 1000) {
+                tryNodalUpdate(testing_node, V.getInt(target));
+            } else {
+                // only if the supernode containing nbd is not singleton
+                if(getSize(V.getInt(testing_node)) > 1) tryNodalUpdate(testing_node, newSupernode());
+            }
         }
     }
 
