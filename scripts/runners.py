@@ -106,7 +106,7 @@ class AlgorithmRunner(ABC):
                     if f.startswith(output_name):
                         try:
                             os.remove(os.path.join(summary_dir, f))
-                        except OSError:
+                        except OSError as e:
                             self.logger.debug(f"[!] Cleanup failed for {f.name}: {e}")
 
             return parsed_time, parsed_ratio
