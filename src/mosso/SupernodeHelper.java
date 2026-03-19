@@ -73,6 +73,77 @@ public class SupernodeHelper extends SummaryGraphModule {
         return Nv;
     }
 
+    // protected IntArrayList get2HopNeighbors(int v, int b) {
+    //     IntArrayList nbrs = getNeighbors(v);
+    //     IntArrayList nbrs2Hop = new IntArrayList();
+
+    //     final int num_to_sample = Integer.min(b, nbrs.size());
+
+    //     for (int one_hop : nbrs) {
+    //         if (one_hop > v) { // Avoiding duplicate node pairs, as {u, v} = {v, u}
+    //             nbrs2Hop.add(one_hop);
+    //         }
+    //     }
+
+    //     IntArrayList subset = new IntArrayList(num_to_sample);
+    //     int count = 0;
+
+    //     for (int i = 0; i < num_to_sample; i++) {
+    //         subset.add(nbrs.getInt(i));
+    //     }
+
+    //     for (int w : subset) {
+    //         IntArrayList nbrsW = getNeighbors(w);
+    //         for (int nbr : nbrsW) {
+    //             if (!nbrs2Hop.contains(nbr)) {
+    //                 nbrs2Hop.add(nbr);
+    //             }
+    //         }
+    //     }
+
+    //     return nbrs2Hop;
+    // }
+
+    
+    protected IntArrayList get2HopNeighbors(int v, int b) {
+        final IntArrayList oneHop = getNeighbors(v);        // N(u)
+        final int n = oneHop.size();
+        if (n == 0) return new IntArrayList(0);
+
+        // === 1) Put N(u) into a set (dedup base), and exclude v if present ===
+        final IntOpenHashSet pool = new IntOpenHashSet(Math.max(16, n * 2));
+        for (int i = 0; i < n; i++) {
+            final int uNbr = oneHop.getInt(i);
+            if (uNbr != v) pool.add(uNbr);
+        }
+
+        // === 2) Sample b distinct neighbors S ⊂ N(u) uniformly (without replacement) ===
+        final int s = Math.min(b, n);
+        if (s > 0) {
+            // Reservoir sample indices [0..n-1]
+            final int[] pickIdx = new int[s];
+            for (int i = 0; i < s; i++) pickIdx[i] = i;
+            for (int i = s; i < n; i++) {
+                final int j = randInt(0, i);   // inclusive [0,i]
+                if (j < s) pickIdx[j] = i;
+            }
+
+            // === 3) Expand via neighbors of each sampled w and add to pool ===
+            for (int i = 0; i < s; i++) {
+                final int w = oneHop.getInt(pickIdx[i]);   // w ∈ S
+                final IntArrayList nbrsW = getNeighbors(w);
+                for (int k = 0, m = nbrsW.size(); k < m; k++) {
+                    final int x = nbrsW.getInt(k);
+                    if (x != v) pool.add(x); // avoid self
+                }
+            }
+        }
+
+        // === 4) Emit as IntArrayList ===
+        return new IntArrayList(pool);
+    }
+
+
     protected int getNeighborCost(int v){
         return getDegree(v) + P.getAdjList().get(V.getInt(v)).size() + 2 * Cm.getAdjList().get(v).size();
     }

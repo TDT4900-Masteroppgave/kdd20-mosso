@@ -348,12 +348,14 @@ public class MoSSo extends SupernodeHelper {
     }
 
     private void _processEdge(final int dst, IntArrayList srcnbd, final int which) {
+        // int maxDegree = 5;
         IntArrayList testing_nodes = new IntArrayList();
         Long2ObjectOpenHashMap<IntArrayList> srcGrp = new Long2ObjectOpenHashMap<>();
 
         // creates testing nodes from testing pool by accepting each node with probability 1/deg(w)
         for (int v : srcnbd) {
-            if (!testing_nodes.contains(v) && randInt(1, getDegree(v)) <= 1 ) {
+            // if (!testing_nodes.contains(v) && getDegree(v) <= maxDegree) {
+            if (!testing_nodes.contains(v)) {
                 testing_nodes.add(v);
             }
         }
@@ -435,8 +437,123 @@ public class MoSSo extends SupernodeHelper {
         }
     }
 
+    private IntArrayList sampleKWithoutReplacement(IntArrayList items, int k) {
+        final int n = items.size();
+        final IntArrayList result = new IntArrayList(k);
+        if (k <= 0 || n == 0) return result;
+
+        k = Math.min(k, n);
+
+        // In-place partial Fisher–Yates on a scratch copy so we don't mutate the input
+        IntArrayList a = new IntArrayList(items); // copy
+        for (int i = 0; i < k; i++) {
+            // pick j uniformly from [i, n-1]
+            int j = randInt(i, n - 1); // uses your SupernodeHelper.randInt(lo, hi)
+            int vi = a.getInt(i);
+            int vj = a.getInt(j);
+            a.set(i, vj);
+            a.set(j, vi);
+            result.add(a.getInt(i));
+        }
+        return result;
+    }
+
+    IntArrayList getTopK2HopNbrs(int v, int b, int k) {
+        IntArrayList nbrs2Hop = get2HopNeighbors(v, b);
+        int maxDegree = 9;
+
+        final IntArrayList resultIds = new IntArrayList();
+        if (k <= 0 || nbrs2Hop.isEmpty()) return resultIds;
+
+        final int[] topIds = new int[k];
+        final double[] topSims = new double[k];
+        int size = 0;
+
+        // Current pruning bar for calculateMH:
+        //  - while size < k, pass -1.0 so calculateMH does full evaluation
+        //  - once we have k items, pass the current k-th best (minimum in the buffer)
+        double pruneCut = 0.0;        // real value only meaningful once size == k
+        boolean haveCut = false;      // tracks whether pruneCut is valid
+
+        for (int i = 0; i < nbrs2Hop.size(); i++) {
+            final int nbr = nbrs2Hop.getInt(i);
+            if (getDegree(v) > maxDegree) continue; 
+            if (nbr == v) continue;
+
+            final double currentBestSim = haveCut ? pruneCut : -1.0;
+            final double sim = calculateMH(v, nbr, currentBestSim);
+            if (sim < 0.0) continue;               // your calculateMH uses -1.0 to say "cannot beat currentBestSim"
+
+            if (size < k) {
+                topIds[size]  = nbr;
+                topSims[size] = sim;
+                size++;
+
+                if (size == k) {
+                    // compute current minimum among the k to initialize pruneCut
+                    pruneCut = topSims[0];
+                    for (int j = 1; j < k; j++) if (topSims[j] < pruneCut) pruneCut = topSims[j];
+                    haveCut = true;
+                }
+            } else {
+                // find index of current minimum in the top-K buffer
+                int minIdx = 0;
+                double minVal = topSims[0];
+                for (int j = 1; j < k; j++) {
+                    if (topSims[j] < minVal) { minVal = topSims[j]; minIdx = j; }
+                }
+
+                // replace if the new candidate is better than the current minimum
+                if (sim > minVal) {
+                    topIds[minIdx]  = nbr;
+                    topSims[minIdx] = sim;
+
+                    // refresh pruneCut (new k-th best)
+                    pruneCut = topSims[0];
+                    for (int j = 1; j < k; j++) if (topSims[j] < pruneCut) pruneCut = topSims[j];
+                    haveCut = true;
+                }
+            }
+        }
+        
+        if (size == 0) return resultIds;
+        
+        // Sort the buffer by similarity desc (K is small; insertion sort is fine)
+        // for (int i = 1; i < size; i++) {
+        //     int id = topIds[i]; double s = topSims[i];
+        //     int j = i - 1;
+        //     while (j >= 0 && topSims[j] < s) {
+        //         topIds[j + 1]  = topIds[j];
+        //         topSims[j + 1] = topSims[j];
+        //         j--;
+        //     }
+        //     topIds[j + 1]  = id;
+        //     topSims[j + 1] = s;
+        // }
+        
+        // final int numUnique = size;
+        
+        // while (size < k) {
+        //     final int remaining = k - size;
+            
+        //     final int take = Math.min(remaining, numUnique);     
+        //     // Copy the first 'take' winners again to fill up
+        //     for (int i = 0; i < take; i++) {
+        //         topIds[size + i] = topIds[i];
+        //     }
+        //     size += take;
+
+        // }
+
+        // Emit ids in order. If you also need scores, see the overload below.
+        for (int i = 0; i < size; i++) resultIds.add(topIds[i]);
+        return resultIds;
+
+    }
+
     @Override
     public void processEdge(final int src, final int dst, final boolean add) {
+        int b = 5;
         iteration += 1;
         if(add){
             ecnt += 1;
@@ -457,14 +574,16 @@ public class MoSSo extends SupernodeHelper {
         updateHash(src, dst, add);
         int which = randInt(0, n_hash-1);
         if(getDegree(src) > 0){
-            IntArrayList srcnbd = getRandomNeighbors(src, sampleNumber);
+            IntArrayList src2hop = get2HopNeighbors(src, b);
+            IntArrayList srcnbd = sampleKWithoutReplacement(src2hop, sampleNumber);
             _processEdge(dst, srcnbd, which);
         }else{
             // since node src is an isolated node
             deactivateNode(src);
         }
         if(getDegree(dst) > 0){
-            IntArrayList dstnbd = getRandomNeighbors(dst, sampleNumber);
+            IntArrayList dst2hop = get2HopNeighbors(dst, b);
+            IntArrayList dstnbd = sampleKWithoutReplacement(dst2hop, sampleNumber);
             _processEdge(src, dstnbd, which);
         }else{
             // since node dst is an isolated node
