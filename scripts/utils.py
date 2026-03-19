@@ -1,4 +1,3 @@
-import os
 import subprocess
 import urllib.request
 import gzip
@@ -22,14 +21,11 @@ def setup_directories():
 def retrieve_github_code(target_dir: str, algo_name: str, repo_url: str, branch: str, logger):
     try:
         if not os.path.exists(target_dir):
-            logger.info(f"\t\t[*] Directory for {algo_name} did not exist")
-            logger.info(f"\t\t[*] Cloning {repo_url}")
-
+            logger.info(f"    -> [{algo_name}] Target directory not found. Cloning fresh...")
             subprocess.run(["git", "clone", "-q", "--branch", branch, "--single-branch", repo_url, target_dir],
                            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         else:
-            logger.info(f"\t\t[*] Directory for {algo_name} already exist")
-            logger.info(f"\t\t[*] Pulling {repo_url}")
+            logger.info(f"    -> [{algo_name}] Target directory exists. Pulling latest updates...")
             subprocess.run(["git", "pull", "-q"], cwd=target_dir,
                            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     except subprocess.CalledProcessError as e:
@@ -140,13 +136,11 @@ def format_dataframe_with_baseline(df, strategies, baseline_algo=None):
 
 def get_datasets_to_run(args):
     """Deciding which datasets to process."""
-    datasets_to_run = [("local", args.file)] if args.file else []
-    if not args.file:
-        if args.group == "all":
-            for cat, data_list in DATASETS.items():
-                for url, filename in data_list:
-                    datasets_to_run.append((url, filename))
-        else:
-            for url, filename in DATASETS[args.group]:
-                datasets_to_run.append((url, filename))
+    datasets_to_run = []
+    if args.group == "all":
+        for group in DATASETS.values():
+            datasets_to_run.extend(group)
+    else:
+        datasets_to_run.extend(DATASETS.get(args.group, []))
+
     return datasets_to_run

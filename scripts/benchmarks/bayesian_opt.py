@@ -37,9 +37,7 @@ class BayesianOptimizationBenchmark(Benchmark):
             random_state=42
         )
 
-    def process(self, dataset_path: str):
-        dataset_name = os.path.basename(dataset_path)
-
+    def process(self, dataset_path: str, dataset_name: str):
         for algo_name, algo_config in self.active_algos.items():
             template = algo_config.get('template', [])
             base_params = algo_config.get('params', {})
@@ -102,18 +100,18 @@ class BayesianOptimizationBenchmark(Benchmark):
     def print_table(self):
         avg_df = self._get_averaged_dataframe()
         if avg_df.empty: return
-        pareto_df = get_pareto_front_2d(avg_df, 'Time', 'Ratio').sort_values(by="Time")
-        self.logger.info("\n--- BAYESIAN OPTIMIZATION: RECOMMENDED DEFAULTS ---")
+        pareto_df = get_pareto_front_2d(avg_df, 'Time', 'Ratio').sort_values(by=["Ratio", "Time"])
+        self.logger.info("--- BAYESIAN OPTIMIZATION---")
         self.logger.info(tabulate(pareto_df, headers='keys', tablefmt='grid', showindex=False))
 
     def finalize(self):
-        if not self.results: return
         raw_df = pd.DataFrame(self.results)
         avg_df = self._get_averaged_dataframe()
 
         # Save Tables
         table_output = "--- BAYESIAN SEARCH RESULTS ---\n"
-        table_output += tabulate(avg_df.sort_values("Optimization_Score"), headers='keys', tablefmt='grid')
+        sorted_avg_df = avg_df.sort_values(by=["Ratio", "Time"])
+        table_output += tabulate(sorted_avg_df, headers='keys', tablefmt='grid')
         with open(os.path.join(self.session_dir, "table_results.txt"), "w") as f:
             f.write(table_output)
 

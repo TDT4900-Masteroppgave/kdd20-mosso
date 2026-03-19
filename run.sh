@@ -48,6 +48,9 @@ case $TYPE in
     bayesian)
       python3 -m scripts.benchmarks.bayesian_opt "$@"
         ;;
+    metadata)
+          python3 -m scripts.dataset_metadata "$@"
+            ;;
     *)
         echo "Usage: ./run.sh --type {compare|sweep|latin} [options]"
         echo "Example: ./run.sh --type compare --methods mags --group one"
