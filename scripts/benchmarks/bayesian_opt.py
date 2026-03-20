@@ -79,18 +79,49 @@ class BayesianOptimizationBenchmark(Benchmark):
     def _get_averaged_dataframe(self):
         if not self.results: return pd.DataFrame()
         df = pd.DataFrame(self.results)
-        # We removed Optimization_Score, so we don't need to filter it out anymore
-        group_cols = [col for col in df.columns if col not in ['Dataset', 'Time', 'Ratio']]
+
+        # Normalize Time and Ratio per Dataset (Scale: 0.0 to 1.0)
+        # Divide by the maximum value observed in each dataset so massive graphs
+        # don't mathematically overpower the small graphs.
+        df['Time_Norm'] = df.groupby('Dataset')['Time'].transform(lambda x: x / x.max())
+        df['Ratio_Norm'] = df.groupby('Dataset')['Ratio'].transform(lambda x: x / x.max())
+
+        # Group by Hyperparameters and calculate the mean
+        group_cols = [col for col in df.columns if col not in ['Dataset', 'Time', 'Ratio', 'Time_Norm', 'Ratio_Norm']]
         avg_df = df.groupby(group_cols).mean(numeric_only=True).reset_index()
-        avg_df['Dataset'] = 'AVERAGE_ACROSS_DATASETS'
+
+        # Preserve the raw averages for display, but overwrite the main
+        # Time/Ratio columns with the Normalized values so the plotter uses them!
+        avg_df['Raw_Time_Avg'] = avg_df['Time']
+        avg_df['Raw_Ratio_Avg'] = avg_df['Ratio']
+
+        avg_df['Time'] = avg_df['Time_Norm']    # Now represents "Normalized Time Score"
+        avg_df['Ratio'] = avg_df['Ratio_Norm']  # Now represents "Normalized Ratio Score"
+
+        avg_df = avg_df.drop(columns=['Time_Norm', 'Ratio_Norm'])
+        avg_df['Dataset'] = 'GLOBAL_NORMALIZED_AVERAGE'
+
         return avg_df
 
     def print_table(self):
         avg_df = self._get_averaged_dataframe()
         if avg_df.empty: return
+
+        # Calculate Pareto using the new Normalized 0-1 metrics
         pareto_df = get_pareto_front_2d(avg_df, 'Time', 'Ratio').sort_values(by=["Ratio", "Time"])
-        self.logger.info("\n--- OPTUNA OPTIMIZATION: RECOMMENDED DEFAULTS (Sorted by Ratio) ---")
-        self.logger.info(tabulate(pareto_df, headers='keys', tablefmt='grid', showindex=False))
+
+        # Rename columns for the terminal so it makes sense to the reader
+        display_df = pareto_df.rename(columns={
+            'Time': 'Norm_Time_Score',
+            'Ratio': 'Norm_Ratio_Score'
+        })
+
+        # Rearrange columns so the Raw averages are next to the Normalized scores
+        cols = ['Algorithm'] + [c for c in display_df.columns if c not in ['Dataset', 'Algorithm', 'Raw_Time_Avg', 'Raw_Ratio_Avg', 'Norm_Time_Score', 'Norm_Ratio_Score']] + ['Raw_Time_Avg', 'Norm_Time_Score', 'Raw_Ratio_Avg', 'Norm_Ratio_Score']
+        display_df = display_df[cols]
+
+        self.logger.info("\n--- OPTUNA OPTIMIZATION: GLOBAL PARETO FRONT (Normalized Scale 0.0 - 1.0) ---")
+        self.logger.info(tabulate(display_df, headers='keys', tablefmt='grid', showindex=False))
 
     def finalize(self):
         if not self.results: return
