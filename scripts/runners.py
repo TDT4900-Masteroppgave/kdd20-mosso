@@ -88,6 +88,7 @@ class AlgorithmRunner(ABC):
         graph_output_path = os.path.join(summary_dir, output_name)
 
         cmd = self.build_command(format_dataset_path, graph_output_path, parameters, template)
+        self.logger.debug(f"-> [{self.algo_name}] Running command: {' '.join(cmd)}")
 
         try:
             result = self._run_cmd(cmd, timeout=timeout)
